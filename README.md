@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-46%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen)](tests/)
 [![Providers](https://img.shields.io/badge/LLM%20providers-15-purple)]()
 [![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)]()
 
@@ -415,6 +415,28 @@ docker run -p 3000:3000 \
 ```
 
 The image uses a multi-stage build (builder + slim runtime), includes git for shallow cloning, and runs as `NODE_ENV=production`.
+
+### Deploy to Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template)
+
+1. Fork this repo and connect it to Railway
+2. Set environment variables in Railway dashboard: `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, and your LLM provider key (e.g. `ANTHROPIC_API_KEY`)
+3. Railway auto-detects `railway.json` — builds from the Dockerfile, uses `/healthz` healthcheck
+4. Update your GitHub App's webhook URL to `https://your-app.up.railway.app/api/github/webhooks`
+
+### Deploy to Render
+
+1. Fork this repo and create a new Web Service on Render
+2. Render auto-detects `render.yaml` — set secret env vars (`GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`)
+3. Update your GitHub App's webhook URL to `https://your-app.onrender.com/api/github/webhooks`
+
+### Health Endpoints
+
+| Endpoint | Purpose | Success |
+|---|---|---|
+| `GET /healthz` | Liveness — process is running | `200` with version, uptime, spec count |
+| `GET /ready` | Readiness — specs loaded, ready to serve | `200` if specs > 0, `503` otherwise |
 
 ---
 

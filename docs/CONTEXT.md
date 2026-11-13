@@ -76,7 +76,16 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
-### 2026-11-13 — Session 4 (Provider wiring)
+### 2026-11-13 — Session 4 (v0.4.1 — bugfixes + deployment)
+- **Fixed model resolution bug**: `--provider openai` (or any non-Anthropic) no longer falls back to `claude-opus-5-5`; the orchestrator now resolves the provider's default model (e.g. `gpt-4o` for OpenAI, `gemini-2.5-pro` for Gemini) when no explicit `--model` is given.
+- **Fixed webhook prompt order**: `autoMigrate()` in webhooks.ts had system/user prompts swapped in the `runAgentLoop` call — the detailed migration prompt was the system message and the brief instruction was the user message.
+- **Fixed Dockerfile**: Builder stage needs full deps for `tsc`; now does `npm ci` (all deps) in builder, `npm ci --omit=dev` in runtime stage.
+- **Deployment configs**: Added `railway.json` (Dockerfile builder, healthcheck, restart policy) and `render.yaml` (web service with env var template).
+- **Health endpoints**: `/healthz` now returns version + uptime; added `/ready` (503 if no specs loaded).
+- **Version**: 0.4.1. Tests: 52 passing (4 new).
+- Next: deploy to Railway/Render (register real URL with GitHub App), billing integration (0.5), Python language support.
+
+### 2026-11-13 — Session 4a (Provider wiring)
 - **Wired `--provider` flag end-to-end**: The CLI's `--provider <id>` option now actually reaches the orchestrator and routes to the correct engine:
   - Anthropic (default, or `--provider anthropic`): uses the Agent SDK path (`runMigrationAgent`) — most capable, with caching and native tool support.
   - Any other provider (`--provider openai`, `--provider ollama`, etc.): uses the provider-agnostic agent loop (`runProviderMigration` → `runAgentLoop`) with the resolved provider from the registry.
