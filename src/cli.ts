@@ -8,7 +8,7 @@ import { renderScanTable } from "./scanner/scan.js";
 import { SpecValidationError } from "./types.js";
 
 const program = new Command();
-program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.6.0");
+program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.7.0");
 
 const common = (cmd: Command) =>
   cmd
@@ -115,6 +115,90 @@ function summarize(outcome: any): void {
     );
   console.log(`Report: .evergreen/MIGRATION_REPORT.md${outcome.branch ? ` (committed on ${outcome.branch})` : ""}`);
 }
+
+program
+  .command("validate")
+  .description("Validate a changefeed spec JSON file")
+  .argument("<file>", "path to changefeed spec JSON")
+  .option("--json", "machine-readable output", false)
+  .action(async (file: string, o: { json: boolean }) => {
+    try {
+      const { loadSpec } = await import("./changefeed/loader.js");
+      const { specRef } = await import("./types.js");
+      const spec = await loadSpec(resolve(file));
+      if (o.json) {
+        console.log(JSON.stringify({ valid: true, ref: specRef(spec), rules: spec.changes.length, languages: spec.languages }));
+      } else {
+        console.log(`\nValid changefeed spec`);
+        console.log(`  Ref:       ${specRef(spec)}`);
+        console.log(`  Title:     ${spec.title}`);
+        console.log(`  Vendor:    ${spec.vendor}`);
+        console.log(`  API:       ${spec.api} ${spec.version}`);
+        console.log(`  Languages: ${spec.languages.join(", ")}`);
+        console.log(`  Rules:     ${spec.changes.length}`);
+        if (spec.deadline) console.log(`  Deadline:  ${spec.deadline}`);
+        console.log(`\nRules:`);
+        for (const c of spec.changes) {
+          console.log(`  [${c.severity.padEnd(12)}] ${c.id}: ${c.title}`);
+          console.log(`               ${c.detect.patterns.length} pattern(s), ${c.detect.filePatterns.join(", ")}`);
+        }
+        console.log();
+      }
+    } catch (e) {
+      if (e instanceof SpecValidationError) {
+        if (o.json) {
+          console.log(JSON.stringify({ valid: false, errors: e.message.split("\n") }));
+        } else {
+          console.error(`\nInvalid spec: ${file}\n${e.message}\n`);
+        }
+        process.exitCode = 1;
+      } else {
+        console.error((e as Error).message);
+        process.exitCode = 1;
+      }
+    }
+  });
+
+program
+  .command("init")
+  .description("Create a .evergreen.yaml config file in the current repo")
+  .option("--repo <path>", "target repository", process.cwd())
+  .action(async (o) => {
+    const { writeFile, access } = await import("node:fs/promises");
+    const configPath = join(resolve(o.repo), ".evergreen.yaml");
+    try {
+      await access(configPath);
+      console.error(`.evergreen.yaml already exists at ${configPath}`);
+      process.exitCode = 1;
+      return;
+    } catch { /* file doesn't exist — proceed */ }
+
+    const template = `# Evergreen configuration — controls how migrations run in this repo.
+# See: https://github.com/ankitjha67/evergreen
+
+# LLM provider for migrations (default: anthropic)
+# provider: anthropic
+
+# Model override (default: provider's default model)
+# model: claude-opus-5-5
+
+# Confidence threshold — files below this score are reverted (0..1)
+threshold: 0.7
+
+# Verify command — runs after migration to check nothing broke
+# verify: npm test
+
+# Auto-triage findings with Haiku before migrating
+triage: true
+
+# Specs to watch (vendor@api references). Empty = scan against all bundled specs.
+# specs:
+#   - stripe@stripe-node@2025-03-31.basil
+#   - stripe@stripe-python@2025-03-31.basil
+`;
+    await writeFile(configPath, template, "utf8");
+    console.log(`Created .evergreen.yaml at ${configPath}`);
+  });
 
 program
   .command("serve")

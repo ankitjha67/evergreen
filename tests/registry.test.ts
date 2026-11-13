@@ -9,9 +9,10 @@ describe("FR-08.4 SpecRegistry", () => {
   it("loads all valid specs from the specs/ directory", async () => {
     const reg = new SpecRegistry();
     await reg.loadFromDirectory(SPECS_DIR);
-    expect(reg.size).toBeGreaterThanOrEqual(2); // stripe + openai at minimum
-    expect(reg.get("stripe@2025-03-31.basil")).toBeDefined();
-    expect(reg.get("openai@v4")).toBeDefined();
+    expect(reg.size).toBeGreaterThanOrEqual(3); // stripe-node + openai + stripe-python at minimum
+    expect(reg.get("stripe@stripe-node@2025-03-31.basil")).toBeDefined();
+    expect(reg.get("openai@openai-node@v4")).toBeDefined();
+    expect(reg.get("stripe@stripe-python@2025-03-31.basil")).toBeDefined();
   });
 
   it("allSpecs returns an array of all loaded specs", async () => {
@@ -34,7 +35,7 @@ describe("FR-08.4 SpecRegistry", () => {
       expect(s.languages).toContain("javascript");
     }
     const pySpecs = reg.forLanguage("python");
-    expect(pySpecs.length).toBe(0); // none of our current specs target python
+    expect(pySpecs.length).toBeGreaterThanOrEqual(1); // stripe-python spec targets python
   });
 
   it("get returns undefined for unknown specRef", async () => {

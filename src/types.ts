@@ -117,4 +117,4 @@ export class SpecValidationError extends Error {
   }
 }
 
-export const specRef = (s: BreakingChangeSpec): string => `${s.vendor}@${s.version}`;
+export const specRef = (s: BreakingChangeSpec): string => `${s.vendor}@${s.api}@${s.version}`;

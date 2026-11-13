@@ -1,0 +1,63 @@
+{
+  "specVersion": "1",
+  "vendor": "stripe",
+  "api": "stripe-python",
+  "version": "2025-03-31.basil",
+  "title": "Stripe Python SDK 2025-03-31 (basil) breaking changes",
+  "docsUrl": "https://docs.stripe.com/changelog/basil",
+  "deadline": "2026-12-31",
+  "languages": ["python"],
+  "changes": [
+    {
+      "id": "stripe-py-basil-001",
+      "severity": "breaking",
+      "title": "Upcoming invoice endpoints replaced by Create Preview Invoice",
+      "description": "The Invoice.upcoming() and InvoiceLineItem.list(invoice='upcoming') methods were removed in API version 2025-03-31.basil. They are replaced by Invoice.create_preview(), which returns the same preview invoice object; its line items are paginated via InvoiceLineItem.list on the returned preview.",
+      "detect": {
+        "patterns": ["Invoice\\.upcoming\\s*\\(", "stripe\\.Invoice\\.upcoming\\s*\\(", "invoice\\s*=\\s*['\"]upcoming['\"]"],
+        "filePatterns": ["**/*.py"],
+        "notes": "Parameters largely carry over: customer, subscription, subscription_items map to the same names on create_preview; subscription_* flat params moved under subscription_details in basil."
+      },
+      "replace": {
+        "guidance": "Replace stripe.Invoice.upcoming(params) with stripe.Invoice.create_preview(params). Move subscription_items and subscription_proration_date style params under subscription_details={'items': ..., 'proration_date': ...}. For listing upcoming line items, create the preview first, then use InvoiceLineItem.list(invoice=preview.id).",
+        "before": "upcoming = stripe.Invoice.upcoming(customer=customer_id)",
+        "after": "upcoming = stripe.Invoice.create_preview(customer=customer_id)",
+        "docsUrl": "https://docs.stripe.com/api/invoices/create_preview"
+      }
+    },
+    {
+      "id": "stripe-py-basil-002",
+      "severity": "breaking",
+      "title": "Subscription current_period_start/end moved to subscription items",
+      "description": "In 2025-03-31.basil, the current_period_start and current_period_end attributes were removed from the Subscription resource. Billing periods are now tracked per subscription item: subscription['items']['data'][i]['current_period_start'] / subscription.items.data[i].current_period_end.",
+      "detect": {
+        "patterns": ["subscription\\[?['\"]?current_period_(start|end)", "\\.current_period_(start|end)\\b"],
+        "filePatterns": ["**/*.py"],
+        "notes": "Only flag reads from a Subscription object; reads already on items.data[...] are the NEW pattern and must not be rewritten."
+      },
+      "replace": {
+        "guidance": "Replace subscription.current_period_end (or subscription['current_period_end']) with subscription.items.data[0].current_period_end (or subscription['items']['data'][0]['current_period_end']) for single-item subscriptions. For multi-item subscriptions, compute the relevant item's period. Ensure the subscription fetch expands items.",
+        "before": "renews_at = subscription.current_period_end",
+        "after": "renews_at = subscription.items.data[0].current_period_end",
+        "docsUrl": "https://docs.stripe.com/changelog/basil#subscriptions"
+      }
+    },
+    {
+      "id": "stripe-py-basil-003",
+      "severity": "breaking",
+      "title": "stripe.api_key global assignment replaced by StripeClient",
+      "description": "The global stripe.api_key = 'sk_...' pattern and module-level methods like stripe.Charge.create() are deprecated. Use the instance-based StripeClient pattern: client = stripe.StripeClient('sk_...') then client.charges.create().",
+      "detect": {
+        "patterns": ["stripe\\.api_key\\s*=", "stripe\\.(Charge|Customer|Invoice|Subscription|PaymentIntent|PaymentMethod|Product|Price|Refund|SetupIntent|BalanceTransaction|Payout|Transfer)\\."],
+        "filePatterns": ["**/*.py"],
+        "notes": "The StripeClient pattern supports per-request API keys and is thread-safe. Detect both the api_key assignment and direct module-level resource access."
+      },
+      "replace": {
+        "guidance": "Replace 'stripe.api_key = key' + 'stripe.Charge.create(...)' with 'client = stripe.StripeClient(key)' + 'client.charges.create(...)'. The resource names change from PascalCase class methods to snake_case client attributes: Charge→charges, Customer→customers, PaymentIntent→payment_intents, etc. Keep the StripeClient instantiation near the top of the module or in a factory function.",
+        "before": "stripe.api_key = os.environ['STRIPE_KEY']\ncharge = stripe.Charge.create(amount=1000, currency='usd')",
+        "after": "client = stripe.StripeClient(os.environ['STRIPE_KEY'])\ncharge = client.charges.create(params={'amount': 1000, 'currency': 'usd'})",
+        "docsUrl": "https://docs.stripe.com/development/quickstart?lang=python"
+      }
+    }
+  ]
+}

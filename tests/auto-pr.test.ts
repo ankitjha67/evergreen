@@ -58,14 +58,14 @@ describe("Auto-PR branch naming", () => {
 });
 
 describe("specRef", () => {
-  it("formats as vendor@version", () => {
-    expect(specRef(mockSpec)).toBe("stripe@2025-03-31");
+  it("formats as vendor@api@version", () => {
+    expect(specRef(mockSpec)).toBe("stripe@node@2025-03-31");
   });
 });
 
 describe("manifest shape", () => {
   it("has required fields", () => {
-    expect(mockManifest.specRef).toBe("stripe@2025-03-31");
+    expect(mockManifest.specRef).toBe("stripe@node@2025-03-31");
     expect(mockManifest.engine.model).toBeTruthy();
     expect(mockManifest.files).toHaveLength(1);
     expect(mockManifest.files[0].status).toBe("migrated");

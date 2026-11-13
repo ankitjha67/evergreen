@@ -26,6 +26,7 @@ export const DEFAULTS = {
 } as const;
 
 export async function loadRepoConfig(repo: string): Promise<RepoConfig> {
+  // Try .evergreen.json first (original format)
   try {
     const raw = await readFile(join(repo, ".evergreen.json"), "utf8");
     const cfg = JSON.parse(raw) as RepoConfig;
@@ -34,7 +35,54 @@ export async function loadRepoConfig(repo: string): Promise<RepoConfig> {
     }
     return cfg;
   } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+
+  // Fall back to .evergreen.yaml
+  try {
+    const raw = await readFile(join(repo, ".evergreen.yaml"), "utf8");
+    return parseYamlConfig(raw);
+  } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw e;
   }
+}
+
+export function parseYamlConfig(content: string): RepoConfig {
+  const config: RepoConfig = {};
+  const ignoreList: string[] = [];
+  let inIgnore = false;
+
+  for (const rawLine of content.split("\n")) {
+    const line = rawLine.split("#")[0].trimEnd();
+    if (!line.trim()) { inIgnore = false; continue; }
+
+    if (inIgnore) {
+      const match = line.match(/^\s+-\s+(.+)/);
+      if (match) { ignoreList.push(match[1].trim()); continue; }
+      inIgnore = false;
+    }
+
+    const kv = line.match(/^(\w+)\s*:\s*(.+)/);
+    if (!kv) {
+      if (line.match(/^(\w+)\s*:/)) {
+        const key = line.match(/^(\w+)/)?.[1];
+        if (key === "ignore") inIgnore = true;
+      }
+      continue;
+    }
+    const [, key, val] = kv;
+    const v = val.trim();
+
+    switch (key) {
+      case "provider": config.provider = v; break;
+      case "model": config.model = v; break;
+      case "threshold": config.confidenceThreshold = parseFloat(v); break;
+      case "verify": config.verifyCommand = v; break;
+      case "triage": break; // informational only — CLI flag controls triage
+    }
+  }
+
+  if (ignoreList.length > 0) config.ignore = ignoreList;
+  return config;
 }

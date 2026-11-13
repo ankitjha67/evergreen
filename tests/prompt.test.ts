@@ -45,7 +45,7 @@ describe("FR-04 prompt", () => {
     expect(p).toContain(MANIFEST_RELPATH);
     expect(p).toContain("Edit ONLY files in the work list");
     expect(p).toContain("Preserve whitespace and operator spacing"); // v1.1 rule 6
-    expect(p).toContain("stripe@2025-03-31.basil");
+    expect(p).toContain("stripe@stripe-node@2025-03-31.basil");
   });
 });
 

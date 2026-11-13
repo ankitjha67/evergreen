@@ -162,7 +162,7 @@ export async function createServer(config: ServerConfig) {
 
   // Health check — liveness (always ok if the process is running)
   app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", version: "0.6.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
+    res.json({ status: "ok", version: "0.7.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
   });
 
   // Readiness check — ok only if we have specs loaded and GitHub auth configured
@@ -208,7 +208,7 @@ export async function createServer(config: ServerConfig) {
     const specs = registry.allSpecs().map((s) => ({ ref: specRef(s), vendor: s.vendor, api: s.api, version: s.version, title: s.title, languages: s.languages, rules: s.changes.length }));
     const events = eventLog.recent(20);
     const evtStats = eventLog.stats();
-    res.type("html").send(renderDashboard({ version: "0.6.0", uptime: Math.floor(process.uptime()), specs, events, evtStats, usage }));
+    res.type("html").send(renderDashboard({ version: "0.7.0", uptime: Math.floor(process.uptime()), specs, events, evtStats, usage }));
   });
 
   // Simple in-memory rate limiter for webhook endpoint

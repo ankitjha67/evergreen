@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.6 complete — admin dashboard, specs/events APIs, webhook event log, spec hot-reload, 70 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests.
+**Phase:** Release 0.7 complete — Python language support, `evergreen validate` CLI, `.evergreen.yaml` config, specRef collision fix, 85 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests.
 
 | Workstream | State |
 |---|---|
@@ -33,7 +33,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Triage (FR-03.2) | ✅ **verified live** — Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
 | Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
 | 2nd changefeed (openai v4) | ✅ **verified live** — assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
-| Tests | ✅ vitest, **46 passing** across 10 suites (loader/scanner/git/prompt/triage-parse/server/checks/providers/usage/auto-pr) |
+| Tests | ✅ vitest, **85 passing** across 15 suites |
 | Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
 | Migration agent (FR-04) | ✅ **verified live** — Opus 5.5 migrated both files correctly |
 | Delivery + report (FR-05/06) | ✅ **verified live** — single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
@@ -51,6 +51,10 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Auto-PR on webhook (FR-10) | ✅ Scan→migrate→push branch→open PR→update Check Run. Gated by `AUTO_MIGRATE=true` env var. Usage tracking to `data/usage.jsonl` |
 | Provider CLI (FR-09) | ✅ `evergreen providers` list command + `--provider` flag on migrate |
 | Dockerfile | ✅ Multi-stage build, git-enabled, production-ready |
+| Python language support | ✅ Stripe Python SDK changefeed spec (3 rules), Python fixture repo, scanner handles Python file patterns |
+| `evergreen validate` CLI | ✅ Validates changefeed spec JSON, shows structured info, `--json` flag |
+| `.evergreen.yaml` config | ✅ YAML config fallback (key-value, comments, list items), `evergreen init` command |
+| specRef collision fix | ✅ `specRef` now `vendor@api@version` — multi-language specs no longer collide in registry |
 
 ## 4. Decision Log (append-only)
 | # | Date | Decision | Why | Ref |
@@ -76,6 +80,16 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 7 (Release 0.7 — Python support, validate CLI, YAML config)
+- **Stripe Python SDK changefeed spec** (`specs/stripe-python-2025-03-31-basil.json`): 3 rules covering `Invoice.upcoming` → `Invoice.create_preview`, `current_period_start/end` → `items.data[0]`, and `stripe.api_key` → `StripeClient` pattern. Python-specific `filePatterns: ["**/*.py"]`.
+- **Python fixture repo** (`fixtures/demo-repo-python/`): `billing.py` + `webhooks.py` with realistic Stripe SDK calls. Scanner finds 5+ affected sites across all 3 rules.
+- **`evergreen validate` CLI command**: Validates changefeed spec JSON file — shows ref, title, vendor, API, languages, rules count, deadline, and per-rule breakdown with pattern counts. Supports `--json` flag for machine-readable output.
+- **`evergreen init` CLI command**: Creates `.evergreen.yaml` template config file in a target repo with documented options.
+- **`.evergreen.yaml` config support**: `loadRepoConfig()` now falls back to `.evergreen.yaml` when `.evergreen.json` absent. Simple YAML parser handles key-value pairs, comments, and list items for `ignore` globs. `.json` takes precedence when both exist.
+- **specRef collision fix**: Changed `specRef` from `vendor@version` to `vendor@api@version` — both Stripe specs (`stripe-node` and `stripe-python`) now have unique registry keys. This was causing the Python spec to overwrite the JS spec since they shared vendor and version.
+- **Version**: 0.7.0. Tests: 85 passing across 15 suites (15 new tests in 2 new suites: config, python-spec).
+- Next: deploy to Railway/Render (persistent webhook URL), Ruby/Go language support, billing integration, CI/CD pipeline.
+
 ### 2026-11-13 — Session 6 (Release 0.6 — observability & admin dashboard)
 - **Admin dashboard** (`GET /admin`): Full-featured HTML dashboard with dark theme showing server status, loaded specs, webhook event history, usage stats, and API links. Served from Express with XSS-safe HTML escaping.
 - **Specs API** (`GET /api/specs`): Returns loaded changefeed specs with ref, vendor, API, version, languages, and rule count.
