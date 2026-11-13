@@ -1,0 +1,124 @@
+# CONTEXT.md — Evergreen Living Context
+**The single source of truth for project state. Read this FIRST before any work. Update it AFTER any work.**
+Last updated: 2026-11-13
+
+---
+
+## 1. What is Evergreen (one paragraph)
+Evergreen makes breaking API changes a non-event: when an API vendor ships a breaking change (described as a machine-readable **changefeed spec**), Evergreen scans connected codebases deterministically, then a Claude-powered migration agent rewrites only the affected code under a minimal-diff contract and delivers it as a reviewable branch/PR with an evidence report. Business model: **vendor-pays** (B2B2B). Origin: YC Fall 2026 RFS "Self-Maintaining APIs" — ranked #1 most-open opportunity in our 107-idea competitive study.
+
+## 2. Document Map (read order for any new contributor/session)
+| Doc | Purpose | Authority over |
+|---|---|---|
+| **CONTEXT.md** (this) | Current state, decisions, progress | What's true right now |
+| [BRD.md](BRD.md) | Why this business; market, model, GTM, risks | Business scope |
+| [PRD.md](PRD.md) | What we're building; epics, stories, MVP cut, metrics | Product scope |
+| [FSD.md](FSD.md) | Exact functional behavior; **FR-IDs** | Behavior — code must match |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, boundaries, ADRs | Structure |
+| [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | Stack, layout, data models, sequences, security | Implementation detail |
+
+**Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
+
+## 3. Current Status
+**Phase:** Release 0.3 complete + real GitHub App registered & verified (PRD §9) — next: 0.4 hosted auto-PR + billing
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13).
+
+| Workstream | State |
+|---|---|
+| Docs suite (BRD/PRD/FSD/ARCH/SD) | ✅ v1.0 written 2026-11-13 |
+| Project scaffold (TS/Node) | ✅ typechecks clean |
+| Changefeed loader (FR-01) | ✅ |
+| Git safety + repo targeting (FR-02) | ✅ incl. restore-on-failure verified live |
+| Scanner (FR-03.1) | ✅ verified on fixture (7 findings, 2 rules, 17ms) |
+| Triage (FR-03.2) | ✅ **verified live** — Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
+| Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
+| 2nd changefeed (openai v4) | ✅ **verified live** — assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
+| Tests | ✅ vitest, 16 passing (loader/scanner/git/prompt/triage-parse incl. porcelain regression) |
+| Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
+| Migration agent (FR-04) | ✅ **verified live** — Opus 5.5 migrated both files correctly |
+| Delivery + report (FR-05/06) | ✅ **verified live** — single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
+| CLI (FR-07) | ✅ scan/migrate/report/serve |
+| GitHub App server (FR-08.2) | ✅ Express + webhook signature verification |
+| Webhook handlers (FR-08.2/4) | ✅ push (default-branch only), pull_request (opened/sync/reopen), installation |
+| Shallow clone (FR-08.3) | ✅ installation token auth, temp dir cleanup |
+| Multi-spec scan (FR-08.4) | ✅ SpecRegistry loads all bundled specs, filters by language |
+| Check Run alerts (FR-08.5) | ✅ annotations per finding, 50-batch limit, summary table, deadline shown |
+| App manifest (FR-08.7) | ✅ app-manifest.json + .env.example |
+| Stripe basil spec + fixture | ✅ specs/stripe-2025-03-31-basil.json + fixtures/demo-repo (git-initialized) |
+| End-to-end demo run | ✅ **MILESTONE M1 ACHIEVED 2026-11-13** — all 7 sites migrated, confidences 0.85/0.80, customers.js untouched |
+| GitHub App registration | ✅ **Real app registered on github.com** (App ID 5745187, "Evergreen API Scanner"), installed on all repos, end-to-end webhook→scan→Check Run verified on live repo |
+
+## 4. Decision Log (append-only)
+| # | Date | Decision | Why | Ref |
+|---|---|---|---|---|
+| D1 | 2026-11-13 | Build Self-Maintaining APIs (of 107 RFS ideas) | #1 on openness × ease × impact × Claude-fit; zero funded competition | BRD §1, research report |
+| D2 | 2026-11-13 | Codename **Evergreen** | evergreen-browser metaphor: always up to date; naming provisional | — |
+| D3 | 2026-11-13 | Vendor-pays primary business model | 100-1000× budget vs dev-pays; zero competitors on that side | BRD §5 |
+| D4 | 2026-11-13 | TS/Node 20, Claude Agent SDK engine, Opus 5.5 migrate / Haiku 5.5 triage | ADR-1/2/4 | ARCHITECTURE §3 |
+| D5 | 2026-11-13 | Scan-before-agent, branch isolation, manifest-or-revert, PRs-never-pushes | Trust is the product | FSD FR-02/04, PRD §4 |
+| D6 | 2026-11-13 | Demo target: Stripe 2025-03-31 "basil" changes (invoices.retrieveUpcoming → createPreview; subscription period fields → items) | Real, recent, well-documented breaking changes | FSD FR-01 example, specs/ |
+| D7 | 2026-11-13 | Triage runs through the Agent SDK (Haiku 5.5, no tools, 1 turn), not raw Messages API | Shares Claude Code subscription auth — the only working credential chain on dev machines; raw SDK path deferred to hosted workers with API keys | FSD FR-03.2 v1.1, SD §2 |
+| D8 | 2026-11-13 | 2nd changefeed: openai-node v3→v4 (not Twilio/AWS) | Real, famous, well-documented; exercises import rewrites, method renames, response-shape changes, and a dependency version floor in one spec | specs/openai-node-v4.json |
+| D9 | 2026-11-13 | Express + `@octokit/webhooks` for GitHub App server (not Probot/Hono) | Battle-tested Octokit ecosystem; webhook sig verification built-in; Probot too opinionated | ADR-8, FSD FR-08.2 |
+| D10 | 2026-11-13 | Check Runs for alerts (not Issues or PR comments) | Best UX: inline annotations on exact lines in PR diff; structured conclusion/summary; idempotent; no notification spam | ADR-9, FSD FR-08.5 |
+| D11 | 2026-11-13 | Shallow clone for repo access (not Contents API) | Scanner needs full file enumeration + line-by-line regex; Contents API is N+1; shallow clone is one `git clone --depth 1` | ADR-10, FSD FR-08.3 |
+
+## 5. Open Questions (owner: founder)
+- OQ-1: Python vs Go as 2nd language (PRD §10.1)
+- OQ-2: Apache-2 the spec format day-one? (leaning yes — PRD §10.2)
+- OQ-3: Independent verifier model vs self-reported confidence (PRD §10.3, revisit at 0.2)
+- OQ-4: Product name/domain (Evergreen is provisional — D2)
+
+## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 2 (Real GitHub App registration + end-to-end verified)
+- **Registered a real GitHub App** ("Evergreen API Scanner", App ID 5745187) on github.com with proper permissions (Checks: read+write, Contents: read-only, Metadata: read-only) and subscribed events (push, pull_request).
+- **Webhook proxy**: Set up smee.io channel (`https://smee.io/yFhCBG2yoj1uoDqA`) as webhook URL for local development forwarding to `localhost:3000/api/github/webhooks`.
+- **Credentials configured**: Downloaded private key PEM, created `.env` with `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET`. Added `.gitignore` protecting `.env` and `*.pem`.
+- **dotenv integration**: Installed `dotenv` and added dynamic import to `serve` CLI command so `.env` is loaded before `loadServerConfig()`.
+- **Installed on all repos**: App installed on all 46 repos of `ankitjha67`; installation webhook received and processed (installation ID 181610399).
+- **End-to-end webhook flow verified on live repo**:
+  1. Created `ankitjha67/test-evergreen-scan` public repo with `billing.js` containing Stripe API calls matching the basil spec.
+  2. Push webhook received via smee.io → HMAC-SHA256 signature verified → shallow clone via installation token → scanned against all bundled specs → **3 findings detected** (1 retrieveUpcoming match, 2 current_period_start/end matches).
+  3. **Check Run created on GitHub** with `action_required` conclusion: "Evergreen: Stripe API 2025-03-31 (basil) breaking changes — 3 breaking API change(s) detected".
+  4. **Annotations rendering correctly**: 3 inline warnings on exact lines (6, 13, 14) in `billing.js` with full migration guidance, docs links, and matched patterns.
+  5. Summary table shows rules, file counts, location counts, migration deadline (2026-12-31), and CTA to run `npx evergreen migrate`.
+- This validates the entire 0.3 pipeline end-to-end on a real GitHub repo with real webhooks, not fixtures.
+- Next: deploy to Railway/Render for a persistent URL (replace smee.io), pursue 0.4 (hosted auto-PR + billing).
+
+### 2026-11-13 — Session 1 (Release 0.3 complete)
+- Shipped 0.3: GitHub App integration — full webhook server, read-only scan + Check Run alert delivery.
+- New modules: `src/server/app.ts` (Express + webhook routes), `src/server/webhooks.ts` (push/PR/installation handlers), `src/github/client.ts` (App JWT auth + installation token factory), `src/github/clone.ts` (shallow clone + cleanup), `src/github/checks.ts` (Check Run creation with annotations, 50-batch limit), `src/registry/specs.ts` (loads all bundled specs from specs/).
+- FSD updated with FR-08 (8 subsections). ARCHITECTURE updated with ADR-8/9/10 and GitHub App in context diagram + component table. SYSTEM_DESIGN updated with §8 (server architecture, webhook sequence, auth chain, annotation mapping, registry design, deployment). Security design extended for webhook forgery, token leakage, private repo scanning.
+- New deps: express ^5.3.0, @octokit/webhooks ^14.2.0, @octokit/rest ^22.0.1, @octokit/auth-app ^8.3.1, @types/express.
+- CLI: added `evergreen serve` command. App manifest (`app-manifest.json`) + `.env.example` for setup.
+- Tests: 25 passing (9 new: registry load/filter/lookup, Check Run annotation mapping/batching/conclusion, server health/signature).
+- TypeScript strict: all new modules typecheck clean.
+- Decisions D9 (Express+Octokit over Probot), D10 (Check Runs over Issues), D11 (shallow clone over Contents API) logged.
+- Exit criteria "50 installs" requires deployment + real GitHub App registration — next steps: deploy to Railway/Render, register the app, announce.
+- Observation: 0.2's external-repo exit criterion still open. The GitHub App will naturally surface this when installed on real repos.
+
+### 2026-11-13 — Session 1 (Release 0.2 complete)
+- Shipped 0.2: Haiku triage pass (FR-03.2, runs via Agent SDK for auth consistency — D7), verify-command gating exercised live, four-class token cost accounting (input/cache-read/cache-write/output), whitespace rule 6 added to minimal-diff contract (FSD v1.1), vitest suite (16 tests incl. porcelain-parse regression), openai-node v3→v4 changefeed + fixtures/demo-repo-2.
+- demo2 live run (`--triage --verify`): triage 10/10 correct verdicts including the intentional decoy (payload.data.data from a fetch API → not_affected); migration perfect incl. embeddings double-nesting and package.json ^4 floor (justified out-of-work-list edit per FR-04.3 rule 1); whitespace clean (rule 6 effective); verify exit 0; cost $0.26 migration + $0.20 triage.
+- Observation: triage at ~$0.20 costs comparable to small migrations — worth it only on larger repos / noisier patterns; revisit batching or triage-only-ambiguous-rules at 0.3.
+- 0.2 exit criterion "2 external alpha repos migrated" remains open — needs real external repos, not fixtures.
+- Known issues resolved: cost under-reporting (fixed), whitespace nit (fixed via prompt rule 6 — held in demo2).
+
+### 2026-11-13 — Session 1 (M1 achieved)
+- **BRD Milestone M1 passed:** live end-to-end demo succeeded. Opus 5.5 agent migrated fixtures/demo-repo for Stripe basil: all 3 billing.js sites (incl. subscription_items→subscription_details restructure and listUpcomingLines→createPreview+listLineItems with pagination preserved) and all 4 subscriptions.js sites (current_period_*→items.data[0].current_period_*). customers.js untouched. Single commit on `evergreen/stripe-2025-03-31.basil`, MIGRATION_REPORT.md committed, working tree returned clean to main. Confidences 0.85/0.80.
+- Auth resolution: no standalone claude CLI existed; ran the desktop app's embedded CLI (`%LOCALAPPDATA%\Claude-Data\...\claude-code\2.1.321\...\claude.exe auth login`) — user completed browser flow; the agent is launched with inherited CLAUDE_CODE_* env vars stripped so it reads ~/.claude/.credentials.json.
+- Bugfixes: changedFiles() porcelain parse was corrupted by stdout trim (first line lost leading space → "rc/billing.js") — replaced with `git status --porcelain -z` NUL parsing (statusEntries); restoreFiles now splits tracked (checkout) vs untracked (clean); isCleanTree ignores `.evergreen/` artifacts so forensics never block reruns.
+- Known issues (open): (1) usage telemetry underreports input tokens — cache_read/cache_creation tokens not counted, displayed cost ($0.09) understated; include them in FR-04 usage accounting. (2) Agent dropped a space in one expression (`-Math.floor`) — valid JS, cosmetic; consider adding "preserve whitespace exactly" to minimal-diff contract or a format-preserving check.
+- Next (release 0.2 per PRD §9): LLM triage pass (FR-03.2), verify-command gating demo, 2nd changefeed (Twilio or AWS SDK v2→v3), vitest tests.
+
+### 2026-11-13 — Session 1 (continued)
+- Implemented full MVP pipeline: loader (FR-01), git safety (FR-02), scanner (FR-03.1), prompt + agent (FR-04 via Claude Agent SDK 0.3.x, model claude-opus-5-5), orchestrator with scope-enforcement + confidence gate, branch delivery (FR-05), report (FR-06), CLI (FR-07). Typechecks clean (tsc strict).
+- Verified: scan on fixture finds all 7 affected sites across billing.js/subscriptions.js, ignores customers.js; failed-run path restores fixture to clean main and deletes the migration branch (FR-04.7 observed live).
+- Deviations/notes: vitest deferred (npm peer-dep conflict; tests are P0.5 anyway). Fixture git repo needs `core.longpaths true` on Windows under deep paths (set locally). Scanner dedupes multi-pattern same-line matches.
+- **BLOCKER (diagnosed):** live agent run needs credentials. Machine has only the Claude desktop app (no standalone `claude` CLI anywhere); `~/.claude/.credentials.json` holds an expired, non-renewable OAuth login that the Agent SDK's bundled CLI picks up; desktop-app sign-in does not refresh that file. Stripping inherited CLAUDE_CODE_* env vars did not help (same expired store). Global CLI install was denied by session permissions. User action required in their own terminal: `npm install -g @anthropic-ai/claude-code` then `claude auth login` (or `claude setup-token` → set CLAUDE_CODE_OAUTH_TOKEN user env var; or set ANTHROPIC_API_KEY). Then `npm run demo`.
+- Next: live e2e demo → review agent diff + manifest → tune prompt if needed → vitest P0.5 → triage pass (FR-03.2).
+
+### 2026-11-13 — Session 1
+- Competitive research across all 107 YC RFS ideas (~150 searches); Self-Maintaining APIs ranked #1. Reports: `../../yc-rfs-complete-deep-dive-ranked.md`, `../../yc-rfs-opportunity-report.md`, `../../yc-rfs-catalog.md`.
+- Wrote full docs suite v1.0 (BRD, PRD, FSD, ARCHITECTURE, SYSTEM_DESIGN, CONTEXT, CLAUDE.md).
+- Next: scaffold → FR-01/02/03 → FR-04 agent → fixture + e2e demo.

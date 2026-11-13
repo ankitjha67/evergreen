@@ -1,0 +1,21 @@
+{
+  "name": "Evergreen API Migration",
+  "url": "https://github.com/evergreen-api/evergreen",
+  "description": "Scans your code for breaking API changes and alerts you with exact file:line locations. Migration PRs coming in v0.4.",
+  "public": true,
+  "default_permissions": {
+    "contents": "read",
+    "checks": "write",
+    "pull_requests": "read",
+    "metadata": "read"
+  },
+  "default_events": [
+    "push",
+    "pull_request",
+    "installation"
+  ],
+  "hook_attributes": {
+    "url": "https://YOUR_SERVER/api/github/webhooks",
+    "active": true
+  }
+}

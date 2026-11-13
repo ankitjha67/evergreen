@@ -1,0 +1,41 @@
+{
+  "name": "evergreen",
+  "version": "0.3.0",
+  "description": "Self-maintaining APIs: when a vendor ships a breaking change, Evergreen migrates every connected codebase automatically.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "evergreen": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "demo:scan": "tsx src/cli.ts scan --repo fixtures/demo-repo --spec specs/stripe-2025-03-31-basil.json",
+    "demo": "tsx src/cli.ts migrate --repo fixtures/demo-repo --spec specs/stripe-2025-03-31-basil.json",
+    "demo2": "tsx src/cli.ts migrate --repo fixtures/demo-repo-2 --spec specs/openai-node-v4.json --triage --verify",
+    "test": "vitest run",
+    "serve": "tsx src/cli.ts serve"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.323",
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@octokit/auth-app": "^8.3.1",
+    "@octokit/rest": "^22.0.1",
+    "@octokit/webhooks": "^14.2.0",
+    "commander": "^15.1.0",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "fast-glob": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "smee-client": "^5.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.1.0"
+  }
+}

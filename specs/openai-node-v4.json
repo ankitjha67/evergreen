@@ -1,0 +1,62 @@
+{
+  "specVersion": "1",
+  "vendor": "openai",
+  "api": "openai-node",
+  "version": "v4",
+  "title": "openai-node v3 → v4 SDK migration",
+  "docsUrl": "https://github.com/openai/openai-node/discussions/217",
+  "languages": ["javascript", "typescript"],
+  "changes": [
+    {
+      "id": "openai-v4-001",
+      "severity": "breaking",
+      "title": "Configuration/OpenAIApi replaced by the OpenAI client class",
+      "description": "In openai-node v4, the Configuration + OpenAIApi pair was removed. The SDK exports a default OpenAI class constructed directly with options: `new OpenAI({ apiKey })`. Named imports `Configuration` and `OpenAIApi` no longer exist.",
+      "detect": {
+        "patterns": ["OpenAIApi", "new\\s+Configuration\\s*\\("],
+        "filePatterns": ["**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts"],
+        "notes": "The import line and the two construction lines typically appear together; migrate them as one unit. The dependency floor must move to openai ^4 in package.json — record that file in the manifest."
+      },
+      "replace": {
+        "guidance": "Replace `import { Configuration, OpenAIApi } from \"openai\"` with `import OpenAI from \"openai\"`. Replace the Configuration + OpenAIApi construction with `const openai = new OpenAI({ apiKey: ... })`. Update the `openai` dependency in package.json to `^4.0.0` and record package.json in the manifest.",
+        "before": "import { Configuration, OpenAIApi } from \"openai\";\nconst configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });\nconst openai = new OpenAIApi(configuration);",
+        "after": "import OpenAI from \"openai\";\nconst openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });",
+        "docsUrl": "https://github.com/openai/openai-node/blob/master/MIGRATION.md"
+      }
+    },
+    {
+      "id": "openai-v4-002",
+      "severity": "breaking",
+      "title": "createX methods replaced by resource namespaces",
+      "description": "v4 moved every createX method onto resource namespaces: createChatCompletion → chat.completions.create, createCompletion → completions.create, createEmbedding → embeddings.create, createImage → images.generate. Request params are unchanged for chat/completions/embeddings.",
+      "detect": {
+        "patterns": ["createChatCompletion", "createCompletion\\s*\\(", "createEmbedding", "createImage\\s*\\("],
+        "filePatterns": ["**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts"],
+        "notes": "Pair each rename with rule openai-v4-003: v4 methods return the payload directly (no axios response wrapper)."
+      },
+      "replace": {
+        "guidance": "Rename the method per the mapping (createChatCompletion → chat.completions.create, createCompletion → completions.create, createEmbedding → embeddings.create, createImage → images.generate), keeping arguments as-is.",
+        "before": "const response = await openai.createChatCompletion({ model, messages });",
+        "after": "const completion = await openai.chat.completions.create({ model, messages });",
+        "docsUrl": "https://github.com/openai/openai-node/blob/master/MIGRATION.md"
+      }
+    },
+    {
+      "id": "openai-v4-003",
+      "severity": "breaking",
+      "title": "Axios response wrapper removed — no more .data indirection",
+      "description": "v3 returned axios responses, so payloads lived under `.data` (e.g. `response.data.choices`, and embeddings doubly nested as `response.data.data[0]`). v4 returns the API payload directly: `completion.choices`, `embedding.data[0]`.",
+      "detect": {
+        "patterns": ["\\.data\\.choices", "\\.data\\.data\\s*\\["],
+        "filePatterns": ["**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts"],
+        "notes": "Only applies to responses from the openai client. `.data` on unrelated axios calls must not be touched."
+      },
+      "replace": {
+        "guidance": "Drop exactly one `.data` level on openai responses: `response.data.choices` → `response.choices`; `response.data.data[0].embedding` → `response.data[0].embedding`.",
+        "before": "return response.data.choices[0].message.content;",
+        "after": "return completion.choices[0].message.content;",
+        "docsUrl": "https://github.com/openai/openai-node/blob/master/MIGRATION.md"
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "specVersion": "1",
+  "vendor": "stripe",
+  "api": "stripe-node",
+  "version": "2025-03-31.basil",
+  "title": "Stripe API 2025-03-31 (basil) breaking changes",
+  "docsUrl": "https://docs.stripe.com/changelog/basil",
+  "deadline": "2026-12-31",
+  "languages": ["javascript", "typescript"],
+  "changes": [
+    {
+      "id": "stripe-basil-001",
+      "severity": "breaking",
+      "title": "Upcoming invoice endpoints replaced by Create Preview Invoice",
+      "description": "The Retrieve Upcoming Invoice (invoices.retrieveUpcoming) and List Upcoming Invoice Line Items (invoices.listUpcomingLines) endpoints were removed in API version 2025-03-31.basil. They are replaced by the Create Preview Invoice endpoint (invoices.createPreview), which returns the same preview invoice object; its line items are paginated via invoices.listLineItems on the returned preview, or read from preview.lines.",
+      "detect": {
+        "patterns": ["invoices\\s*\\.\\s*retrieveUpcoming\\b", "invoices\\s*\\.\\s*listUpcomingLines\\b"],
+        "filePatterns": ["**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts"],
+        "notes": "Parameters largely carry over: customer, subscription, subscription_items map to the same names on createPreview; subscription_* flat params moved under subscription_details in basil."
+      },
+      "replace": {
+        "guidance": "Replace stripe.invoices.retrieveUpcoming(params) with stripe.invoices.createPreview(params). Move subscription_items/subscription_proration_date style params under subscription_details: { items, proration_date }. For listUpcomingLines, create the preview first and read its .lines, preserving any pagination the caller did.",
+        "before": "const upcoming = await stripe.invoices.retrieveUpcoming({ customer: customerId });",
+        "after": "const upcoming = await stripe.invoices.createPreview({ customer: customerId });",
+        "docsUrl": "https://docs.stripe.com/api/invoices/create_preview"
+      }
+    },
+    {
+      "id": "stripe-basil-002",
+      "severity": "breaking",
+      "title": "Subscription current_period_start/end moved to subscription items",
+      "description": "In 2025-03-31.basil, the current_period_start and current_period_end fields were removed from the Subscription object. Billing periods are now tracked per subscription item: subscription.items.data[i].current_period_start / current_period_end. For single-item subscriptions, use the first item's period fields.",
+      "detect": {
+        "patterns": ["subscription\\s*\\.\\s*current_period_(start|end)\\b", "\\.current_period_(start|end)\\b"],
+        "filePatterns": ["**/*.js", "**/*.mjs", "**/*.cjs", "**/*.ts"],
+        "notes": "Only flag reads from a Subscription object; reads already on items.data[...] are the NEW pattern and must not be rewritten. If the variable is an invoice line or subscription item, it is not affected."
+      },
+      "replace": {
+        "guidance": "Replace subscription.current_period_end with subscription.items.data[0].current_period_end (and same for _start) when the subscription has a single item, which is the common case; if the code manages multi-item subscriptions, compute the relevant item's period instead and note it in the manifest. Ensure the subscription fetch expands or includes items (stripe-node includes items.data by default up to 10 items).",
+        "before": "const renewsAt = subscription.current_period_end;",
+        "after": "const renewsAt = subscription.items.data[0].current_period_end;",
+        "docsUrl": "https://docs.stripe.com/changelog/basil#subscriptions"
+      }
+    }
+  ]
+}
