@@ -8,7 +8,7 @@ import { renderScanTable } from "./scanner/scan.js";
 import { SpecValidationError } from "./types.js";
 
 const program = new Command();
-program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.7.0");
+program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.8.0");
 
 const common = (cmd: Command) =>
   cmd
@@ -198,6 +198,89 @@ triage: true
 `;
     await writeFile(configPath, template, "utf8");
     console.log(`Created .evergreen.yaml at ${configPath}`);
+  });
+
+// evergreen diff — preview what migration would change, without running the agent
+common(program.command("diff").description("Preview which files and rules a migration would touch (scan + rule detail, no agent run)"))
+  .option("--triage", "triage findings first", false)
+  .action(async (o) => {
+    try {
+      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: o.triage, json: false });
+      const findings = outcome.triage
+        ? outcome.triage.verdicts.filter((v: any) => v.verdict !== "not_affected")
+        : outcome.scan.findings;
+
+      if (findings.length === 0) {
+        console.log("\nNo affected code found. Nothing to migrate.\n");
+        process.exitCode = 0;
+        return;
+      }
+
+      // Group findings by file
+      const byFile = new Map<string, any[]>();
+      for (const f of findings) {
+        const arr = byFile.get(f.file) ?? [];
+        arr.push(f);
+        byFile.set(f.file, arr);
+      }
+
+      const ruleMap = new Map(spec.changes.map((c) => [c.id, c]));
+
+      if (o.json) {
+        const files = [...byFile.entries()].map(([file, hits]) => ({
+          file,
+          findings: hits.map((h: any) => ({
+            line: h.line,
+            ruleId: h.ruleId,
+            matchText: h.matchText,
+            guidance: ruleMap.get(h.ruleId)?.replace.guidance,
+          })),
+        }));
+        console.log(JSON.stringify({ specRef: outcome.specRef, files, totalFindings: findings.length }, null, 2));
+      } else {
+        console.log(`\nMigration preview: ${outcome.specRef}`);
+        console.log(`${findings.length} finding(s) across ${byFile.size} file(s)\n`);
+
+        for (const [file, hits] of byFile) {
+          console.log(`  ${file} (${hits.length} finding${hits.length > 1 ? "s" : ""})`);
+          for (const h of hits) {
+            const rule = ruleMap.get(h.ruleId);
+            console.log(`    L${h.line}: [${h.ruleId}] ${h.matchText}`);
+            if (rule?.replace.before && rule?.replace.after) {
+              console.log(`      - ${rule.replace.before}`);
+              console.log(`      + ${rule.replace.after}`);
+            } else if (rule?.replace.guidance) {
+              console.log(`      → ${rule.replace.guidance.slice(0, 100)}`);
+            }
+          }
+          console.log();
+        }
+      }
+      process.exitCode = 0;
+    } catch (e) {
+      fail(e);
+    }
+  });
+
+// evergreen fetch-spec — download a changefeed spec from a URL
+program
+  .command("fetch-spec")
+  .description("Download a changefeed spec from a URL and save to specs/")
+  .argument("<url>", "HTTP(S) URL to a changefeed spec JSON")
+  .option("--out <dir>", "output directory", "specs")
+  .action(async (url: string, o: { out: string }) => {
+    try {
+      const { fetchSpec } = await import("./changefeed/fetch.js");
+      const { specRef } = await import("./types.js");
+      const result = await fetchSpec(url, resolve(o.out));
+      console.log(`\nFetched and validated spec: ${specRef(result.spec)}`);
+      console.log(`  Saved to: ${result.savedTo}`);
+      console.log(`  Title:    ${result.spec.title}`);
+      console.log(`  Rules:    ${result.spec.changes.length}\n`);
+    } catch (e: any) {
+      console.error(`Failed to fetch spec: ${e.message}`);
+      process.exitCode = 1;
+    }
   });
 
 program
