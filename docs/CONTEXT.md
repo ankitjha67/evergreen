@@ -76,6 +76,15 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 4 (Provider wiring)
+- **Wired `--provider` flag end-to-end**: The CLI's `--provider <id>` option now actually reaches the orchestrator and routes to the correct engine:
+  - Anthropic (default, or `--provider anthropic`): uses the Agent SDK path (`runMigrationAgent`) — most capable, with caching and native tool support.
+  - Any other provider (`--provider openai`, `--provider ollama`, etc.): uses the provider-agnostic agent loop (`runProviderMigration` → `runAgentLoop`) with the resolved provider from the registry.
+- Added `runProviderMigration()` in `src/migrator/agent.ts` — wraps the agent loop and reads the manifest, returning the same `AgentRunResult` type.
+- Orchestrator now imports `getProvider` from registry and branches at the agent-run step based on `opts.provider ?? cfg.provider`.
+- Tests: 48 passing (2 new: export check, orchestrator import).
+- Next: deploy to Railway/Render, billing integration (0.5), Python language support.
+
 ### 2026-11-13 — Session 3 (Release 0.4 complete)
 - **Multi-LLM provider abstraction (FR-09)**: Built a provider-agnostic architecture supporting 15 LLM providers:
   - Core providers: Anthropic Claude (via @anthropic-ai/sdk), OpenAI (via openai v7 SDK), Google Gemini (via @google/generative-ai).
