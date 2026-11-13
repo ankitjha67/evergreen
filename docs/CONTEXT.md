@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.5 complete — production-readiness: CLI usage command, graceful shutdown, request logging, rate limiting, 61 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests.
+**Phase:** Release 0.6 complete — admin dashboard, specs/events APIs, webhook event log, spec hot-reload, 70 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests.
 
 | Workstream | State |
 |---|---|
@@ -76,6 +76,16 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 6 (Release 0.6 — observability & admin dashboard)
+- **Admin dashboard** (`GET /admin`): Full-featured HTML dashboard with dark theme showing server status, loaded specs, webhook event history, usage stats, and API links. Served from Express with XSS-safe HTML escaping.
+- **Specs API** (`GET /api/specs`): Returns loaded changefeed specs with ref, vendor, API, version, languages, and rule count.
+- **Events API** (`GET /api/events`): Returns recent webhook events with stats breakdown (by event type, status, repo).
+- **Webhook event log** (`src/server/event-log.ts`): In-memory ring buffer (200 events max) capturing delivery ID, event type, action, repo, sender, status, duration. Wired into all webhook handlers with error tracking.
+- **Spec hot-reload**: `fs.watch` on the specs directory triggers automatic reload when JSON files change — no server restart needed.
+- **SpecRegistry reload**: `loadFromDirectory` now atomically replaces the spec map instead of appending, making hot-reload safe.
+- **Version**: 0.6.0. Tests: 70 passing across 13 suites (9 new tests in 2 new suites).
+- Next: deploy to Railway/Render (persistent webhook URL), billing integration, Python language support.
+
 ### 2026-11-13 — Session 5 (Release 0.5 — production readiness)
 - **`evergreen usage` CLI command**: Displays formatted usage summary (total events, cost, tokens, PRs, breakdowns by event/provider/repo, recent events list). Supports `--json` and `--limit <n>` flags.
 - **Graceful shutdown**: Server handles SIGTERM/SIGINT with 10s drain timeout — clean shutdown for Railway/Render cloud deploys.

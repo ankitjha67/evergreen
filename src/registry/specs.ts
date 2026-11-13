@@ -8,16 +8,18 @@ export class SpecRegistry {
   private specs = new Map<string, BreakingChangeSpec>();
 
   async loadFromDirectory(dir: string): Promise<void> {
+    const fresh = new Map<string, BreakingChangeSpec>();
     const entries = await readdir(dir);
     const jsonFiles = entries.filter((e) => e.endsWith(".json"));
     for (const file of jsonFiles) {
       try {
         const spec = await loadSpec(join(dir, file));
-        this.specs.set(specRef(spec), spec);
+        fresh.set(specRef(spec), spec);
       } catch {
-        // skip invalid specs at startup — log but don't crash
+        // skip invalid specs — log but don't crash
       }
     }
+    this.specs = fresh;
   }
 
   allSpecs(): BreakingChangeSpec[] {

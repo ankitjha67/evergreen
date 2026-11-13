@@ -2,11 +2,14 @@
 import express from "express";
 import { Webhooks } from "@octokit/webhooks";
 import { join, resolve } from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, watch } from "node:fs";
 import { createAppOctokit, AppConfig } from "../github/client.js";
 import { SpecRegistry } from "../registry/specs.js";
 import { handlePush, handlePullRequest, handleInstallation, WebhookContext } from "./webhooks.js";
 import { getUsageSummary } from "../usage.js";
+import { EventLog, type WebhookEvent } from "./event-log.js";
+import { specRef } from "../types.js";
+import { renderDashboard } from "./dashboard.js";
 
 export interface ServerConfig {
   port: number;
@@ -91,19 +94,60 @@ export async function createServer(config: ServerConfig) {
   // Webhook signature verification
   const webhooks = new Webhooks({ secret: config.webhookSecret });
 
+  const eventLog = new EventLog();
   const ctx: WebhookContext = { appOctokit, registry, log };
 
-  // Register event handlers
-  webhooks.on("push", async ({ payload }) => {
-    handlePush(ctx, payload).catch((e) => log("error", `Push handler error: ${e.message}`));
+  // Register event handlers with event logging
+  webhooks.on("push", async ({ id, payload }) => {
+    const start = Date.now();
+    const evt: WebhookEvent = {
+      id, event: "push", repo: payload.repository?.full_name,
+      sender: payload.sender?.login, receivedAt: new Date().toISOString(), status: "processed",
+    };
+    try {
+      await handlePush(ctx, payload);
+    } catch (e: any) {
+      evt.status = "error";
+      evt.error = e.message;
+      log("error", `Push handler error: ${e.message}`);
+    }
+    evt.durationMs = Date.now() - start;
+    eventLog.push(evt);
   });
 
-  webhooks.on("pull_request", async ({ payload }) => {
-    handlePullRequest(ctx, payload).catch((e) => log("error", `PR handler error: ${e.message}`));
+  webhooks.on("pull_request", async ({ id, payload }) => {
+    const start = Date.now();
+    const evt: WebhookEvent = {
+      id, event: "pull_request", action: payload.action,
+      repo: payload.repository?.full_name, sender: payload.sender?.login,
+      receivedAt: new Date().toISOString(), status: "processed",
+    };
+    try {
+      await handlePullRequest(ctx, payload);
+    } catch (e: any) {
+      evt.status = "error";
+      evt.error = e.message;
+      log("error", `PR handler error: ${e.message}`);
+    }
+    evt.durationMs = Date.now() - start;
+    eventLog.push(evt);
   });
 
-  webhooks.on("installation", async ({ payload }) => {
-    handleInstallation(ctx, payload).catch((e) => log("error", `Installation handler error: ${e.message}`));
+  webhooks.on("installation", async ({ id, payload }) => {
+    const start = Date.now();
+    const evt: WebhookEvent = {
+      id, event: "installation", action: payload.action,
+      sender: payload.sender?.login, receivedAt: new Date().toISOString(), status: "processed",
+    };
+    try {
+      await handleInstallation(ctx, payload);
+    } catch (e: any) {
+      evt.status = "error";
+      evt.error = e.message;
+      log("error", `Installation handler error: ${e.message}`);
+    }
+    evt.durationMs = Date.now() - start;
+    eventLog.push(evt);
   });
 
   // Request logging middleware
@@ -118,7 +162,7 @@ export async function createServer(config: ServerConfig) {
 
   // Health check — liveness (always ok if the process is running)
   app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", version: "0.5.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
+    res.json({ status: "ok", version: "0.6.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
   });
 
   // Readiness check — ok only if we have specs loaded and GitHub auth configured
@@ -135,6 +179,36 @@ export async function createServer(config: ServerConfig) {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // Specs API
+  app.get("/api/specs", (_req, res) => {
+    const specs = registry.allSpecs().map((s) => ({
+      ref: specRef(s),
+      vendor: s.vendor,
+      api: s.api,
+      version: s.version,
+      title: s.title,
+      languages: s.languages,
+      rules: s.changes.length,
+      deadline: s.deadline,
+    }));
+    res.json({ count: specs.length, specs });
+  });
+
+  // Webhook event log API
+  app.get("/api/events", (req, res) => {
+    const limit = parseInt((req.query.limit as string) ?? "50", 10);
+    res.json({ events: eventLog.recent(limit), stats: eventLog.stats() });
+  });
+
+  // Admin dashboard
+  app.get("/admin", async (_req, res) => {
+    const usage = await getUsageSummary().catch(() => null);
+    const specs = registry.allSpecs().map((s) => ({ ref: specRef(s), vendor: s.vendor, api: s.api, version: s.version, title: s.title, languages: s.languages, rules: s.changes.length }));
+    const events = eventLog.recent(20);
+    const evtStats = eventLog.stats();
+    res.type("html").send(renderDashboard({ version: "0.6.0", uptime: Math.floor(process.uptime()), specs, events, evtStats, usage }));
   });
 
   // Simple in-memory rate limiter for webhook endpoint
@@ -170,17 +244,36 @@ export async function createServer(config: ServerConfig) {
     }
   });
 
-  return { app, registry };
+  return { app, registry, eventLog };
 }
 
 export async function startServer(config?: ServerConfig): Promise<void> {
   const cfg = config ?? loadServerConfig();
-  const { app } = await createServer(cfg);
+  const { app, registry } = await createServer(cfg);
+
+  // Spec hot-reload: watch specs directory for changes
+  try {
+    const watcher = watch(cfg.specsDir, { persistent: false }, async (eventType, filename) => {
+      if (filename?.endsWith(".json")) {
+        console.log(`[hot-reload] Spec change detected (${filename}), reloading...`);
+        try {
+          await registry.loadFromDirectory(cfg.specsDir);
+          console.log(`[hot-reload] Reloaded ${registry.size} spec(s)`);
+        } catch (e: any) {
+          console.error(`[hot-reload] Reload failed: ${e.message}`);
+        }
+      }
+    });
+    watcher.unref();
+  } catch {
+    console.log("[hot-reload] Could not watch specs directory (fs.watch unavailable)");
+  }
 
   const server = app.listen(cfg.port, () => {
     console.log(`Evergreen GitHub App server listening on port ${cfg.port}`);
     console.log(`Webhook URL: POST http://localhost:${cfg.port}/api/github/webhooks`);
     console.log(`Health check: GET http://localhost:${cfg.port}/healthz`);
+    console.log(`Admin dashboard: http://localhost:${cfg.port}/admin`);
   });
 
   let shuttingDown = false;
