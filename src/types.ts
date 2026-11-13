@@ -93,6 +93,7 @@ export interface RepoConfig {
   verifyCommand?: string;
   confidenceThreshold?: number;
   model?: string;
+  provider?: string;
 }
 
 export interface MigrateOptions {
@@ -104,6 +105,7 @@ export interface MigrateOptions {
   allowDirty?: boolean;
   noGit?: boolean;
   model?: string;
+  provider?: string;
   threshold?: number;
   json?: boolean;
 }

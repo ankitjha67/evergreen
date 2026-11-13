@@ -270,6 +270,83 @@ Precedence: CLI flag > repo config > defaults.
 
 ---
 
+## FR-09 — Multi-LLM Provider Support (Release 0.4)
+
+### FR-09.1 Provider abstraction
+- The migration engine is decoupled from any single LLM vendor via a `LLMProvider` interface.
+- Each provider implements: `chat(messages, tools?, options?) → ChatResponse` with tool-call support.
+- A provider-agnostic **agent loop** drives the migration: send prompt → process tool calls → feed results back → repeat until the model emits a final text response with the manifest.
+- Tool surface remains Read/Edit/Write/Grep/Glob (FR-04.1) regardless of provider — tool implementations are shared.
+
+### FR-09.2 Supported providers
+| Provider | SDK / Protocol | Key | Notes |
+|---|---|---|---|
+| **Anthropic Claude** (default) | `@anthropic-ai/sdk` Messages API | `ANTHROPIC_API_KEY` | Primary, best tool-calling; also supports Agent SDK path |
+| **OpenAI** | `openai` SDK | `OPENAI_API_KEY` | GPT-4o, o1, o3, GPT-5 |
+| **Google Gemini** | `@google/generative-ai` | `GOOGLE_API_KEY` | Gemini 2.5 Pro/Flash |
+| **OpenAI-compatible** | OpenAI SDK with custom `baseURL` | `PROVIDER_API_KEY` + `PROVIDER_BASE_URL` | Covers: Ollama (local), NVIDIA NIM, Groq, Together AI, Fireworks AI, DeepSeek, LM Studio, vLLM, Anyscale, Perplexity, Mistral, Azure OpenAI, AWS Bedrock (via gateway) |
+
+### FR-09.3 Provider selection
+- CLI: `--provider <id>` flag (e.g., `--provider openai`, `--provider ollama`).
+- Server: `MIGRATION_PROVIDER` env var; per-repo `.evergreen.json` can override with `"provider": "<id>"`.
+- Precedence: CLI flag > repo config > env var > default (`anthropic`).
+- `--model <id>` works with any provider (e.g., `--provider openai --model gpt-4o`).
+
+### FR-09.4 Provider registry
+- Providers register via a `ProviderRegistry` with id, display name, default model, and auth requirements.
+- `evergreen providers` CLI command lists available providers with auth status (configured / not configured).
+- Pre-built provider presets for common configurations (e.g., `ollama` = OpenAI-compatible with `http://localhost:11434/v1`).
+
+### FR-09.5 Constraints
+- All providers must support tool/function calling for migration. Providers without tool calling support are available for triage only.
+- The migration prompt is provider-agnostic — same system prompt and tool definitions regardless of backend.
+- Token usage and cost tracking adapts per provider's pricing (configurable rates).
+- Source code sent to providers follows NFR-4 — user must be aware code is sent to the configured provider's API.
+
+---
+
+## FR-10 — Auto-PR on Webhook (Release 0.4)
+
+### FR-10.1 Migration trigger
+- When the webhook scanner (FR-08.4) finds breaking changes, the server can optionally trigger an automated migration and open a PR.
+- Gated by: `AUTO_MIGRATE=true` env var (default: false — scan-only mode is the safe default).
+- Only triggers on **push** to the default branch (not on PRs — PRs get scan-only Check Runs).
+
+### FR-10.2 Hosted migration flow
+1. Scan detects findings → creates "in_progress" Check Run.
+2. Run the existing `migrate` orchestrator (FR-04) on the shallow-cloned repo with the configured provider.
+3. On success: push the `evergreen/*` branch, open a PR via GitHub API.
+4. Update Check Run to `completed` with conclusion `action_required` and a link to the PR.
+5. On failure: update Check Run with error details, do not open PR.
+
+### FR-10.3 PR creation
+- Branch name: `evergreen/<spec.id>` (same as local delivery FR-05.1).
+- PR title: `fix: migrate <spec.title>` (e.g., `fix: migrate Stripe API 2025-03-31 (basil) breaking changes`).
+- PR body: the `MIGRATION_REPORT.md` content, plus a footer: "Migrated automatically by [Evergreen](https://github.com/ankitjha67/evergreen)".
+- Labels: `evergreen`, `automated`.
+- **Never** enable auto-merge. **Never** request reviewers automatically (future config).
+- If an open PR already exists for the same `evergreen/*` branch, force-push the branch and update the PR body (idempotent re-runs).
+
+### FR-10.4 Permissions upgrade
+- GitHub App needs additional permission: **Contents: write** (to push branches) and **Pull requests: write** (to open PRs).
+- Installation token scope is per-run, minimal TTL.
+
+### FR-10.5 Usage logging
+- Every migration run logs to a local JSON-lines file (`data/usage.jsonl`):
+  - Timestamp, repo, spec, provider, model, token counts, cost estimate, duration, outcome (success/failure).
+- `evergreen usage` CLI command summarizes recent runs.
+
+### FR-10.6 Failure modes
+| Failure | Behavior |
+|---|---|
+| Migration agent fails | Check Run updated with error; no PR; log |
+| Branch push fails (permissions) | Check Run updated with error; report includes the local diff |
+| PR creation fails | Branch is pushed; Check Run notes PR creation failure; log |
+| Provider API error (rate limit, auth) | Retry once after 30s; if still fails, report in Check Run |
+| Confidence below threshold for all files | No PR; Check Run notes "migration attempted, confidence too low" |
+
+---
+
 ## Non-Functional Requirements
 
 | ID | Requirement |

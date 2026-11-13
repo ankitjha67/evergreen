@@ -1,11 +1,18 @@
-// FR-08.2/08.4 — GitHub webhook event handlers
+// FR-08.2/08.4/10 — GitHub webhook event handlers + auto-migrate
 import { Octokit } from "@octokit/rest";
-import { BreakingChangeSpec, ScanResult } from "../types.js";
+import { BreakingChangeSpec, ScanResult, specRef } from "../types.js";
 import { SpecRegistry } from "../registry/specs.js";
 import { scan } from "../scanner/scan.js";
 import { shallowClone } from "../github/clone.js";
 import { getInstallationToken, getInstallationOctokit } from "../github/client.js";
 import { createCheckRun, createFailedCheckRun } from "../github/checks.js";
+import { createMigrationPR } from "../github/pr.js";
+import { buildMigrationPrompt } from "../migrator/prompt.js";
+import { runAgentLoop } from "../providers/agent-loop.js";
+import { resolveProvider } from "../providers/registry.js";
+import { logUsage } from "../usage.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export interface WebhookContext {
   appOctokit: Octokit;
@@ -134,6 +141,21 @@ async function scanRepo(ctx: WebhookContext, ref: RepoRef): Promise<void> {
     if (!anyFindings) {
       ctx.log("debug", `No findings in ${fullName} for any spec`);
     }
+
+    // FR-10 — Auto-migrate: if enabled and findings exist, run migration and open PR
+    if (anyFindings && process.env.AUTO_MIGRATE === "true") {
+      for (const spec of specs) {
+        const scanResult: ScanResult = await scan(cloneDir, spec, {});
+        if (scanResult.findings.length === 0) continue;
+
+        ctx.log("info", `Auto-migrating ${fullName} for ${spec.title}`);
+        try {
+          await autoMigrate(ctx, octokit, owner, repo, ref.ref, sha, cloneDir, token, spec, scanResult);
+        } catch (e: any) {
+          ctx.log("error", `Auto-migrate failed for ${spec.title} on ${fullName}: ${e.message}`);
+        }
+      }
+    }
   } finally {
     if (cleanup) {
       try {
@@ -143,4 +165,88 @@ async function scanRepo(ctx: WebhookContext, ref: RepoRef): Promise<void> {
       }
     }
   }
+}
+
+// FR-10 — Auto-migrate + PR creation
+async function autoMigrate(
+  ctx: WebhookContext,
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  baseBranch: string,
+  sha: string,
+  cloneDir: string,
+  token: string,
+  spec: BreakingChangeSpec,
+  scanResult: ScanResult,
+): Promise<void> {
+  const fullName = `${owner}/${repo}`;
+  const startMs = Date.now();
+
+  // Update Check Run to in_progress
+  const { data: checkRun } = await octokit.checks.create({
+    owner,
+    repo,
+    name: `Evergreen Migration: ${spec.title}`,
+    head_sha: sha,
+    status: "in_progress",
+    output: { title: "Migration in progress", summary: `Running auto-migration for ${spec.title}...` },
+  });
+
+  const provider = resolveProvider({});
+  const prompt = buildMigrationPrompt(spec, scanResult.findings);
+
+  const result = await runAgentLoop(
+    provider,
+    prompt,
+    `Migrate the codebase according to the instructions. Work list has ${scanResult.findings.length} findings.`,
+    cloneDir,
+    provider.defaultModel,
+  );
+
+  // Read the manifest to verify migration
+  let manifest;
+  try {
+    const raw = await readFile(join(cloneDir, ".evergreen/manifest.json"), "utf8");
+    manifest = JSON.parse(raw);
+  } catch {
+    ctx.log("error", `Migration did not produce a valid manifest for ${fullName}`);
+    await octokit.checks.update({
+      owner, repo, check_run_id: checkRun.id,
+      status: "completed", conclusion: "failure",
+      output: { title: "Migration failed", summary: "The migration agent did not produce a valid manifest." },
+    });
+    return;
+  }
+
+  // Push branch and open PR
+  const pr = await createMigrationPR(octokit, owner, repo, baseBranch, cloneDir, token, spec, scanResult, manifest);
+  ctx.log("info", `Auto-migration PR created: ${pr.prUrl}`);
+
+  // Update Check Run with PR link
+  await octokit.checks.update({
+    owner, repo, check_run_id: checkRun.id,
+    status: "completed", conclusion: "action_required",
+    output: {
+      title: `Migration PR #${pr.prNumber} opened`,
+      summary: `Auto-migration complete. Review and merge [PR #${pr.prNumber}](${pr.prUrl}).\n\n` +
+        `Files migrated: ${manifest.files.filter((f: any) => f.status === "migrated").length}\n` +
+        `Files skipped: ${manifest.files.filter((f: any) => f.status === "skipped").length}`,
+    },
+  });
+
+  // FR-10.5 — Log usage
+  await logUsage({
+    timestamp: new Date().toISOString(),
+    event: "auto-pr",
+    repo: fullName,
+    specRef: specRef(spec),
+    provider: provider.id,
+    model: provider.defaultModel,
+    usage: result.usage,
+    findings: scanResult.findings.length,
+    filesChanged: manifest.files.filter((f: any) => f.status === "migrated").length,
+    prUrl: pr.prUrl,
+    durationMs: Date.now() - startMs,
+  });
 }

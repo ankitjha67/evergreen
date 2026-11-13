@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.3 complete + real GitHub App registered & verified (PRD §9) — next: 0.4 hosted auto-PR + billing
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13).
+**Phase:** Release 0.4 complete — multi-LLM provider support (15 providers), auto-PR on webhook, Dockerfile, usage tracking, 46 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests.
 
 | Workstream | State |
 |---|---|
@@ -33,7 +33,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Triage (FR-03.2) | ✅ **verified live** — Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
 | Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
 | 2nd changefeed (openai v4) | ✅ **verified live** — assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
-| Tests | ✅ vitest, 16 passing (loader/scanner/git/prompt/triage-parse incl. porcelain regression) |
+| Tests | ✅ vitest, **46 passing** across 10 suites (loader/scanner/git/prompt/triage-parse/server/checks/providers/usage/auto-pr) |
 | Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
 | Migration agent (FR-04) | ✅ **verified live** — Opus 5.5 migrated both files correctly |
 | Delivery + report (FR-05/06) | ✅ **verified live** — single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
@@ -47,6 +47,10 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Stripe basil spec + fixture | ✅ specs/stripe-2025-03-31-basil.json + fixtures/demo-repo (git-initialized) |
 | End-to-end demo run | ✅ **MILESTONE M1 ACHIEVED 2026-11-13** — all 7 sites migrated, confidences 0.85/0.80, customers.js untouched |
 | GitHub App registration | ✅ **Real app registered on github.com** (App ID 5745187, "Evergreen API Scanner"), installed on all repos, end-to-end webhook→scan→Check Run verified on live repo |
+| Multi-LLM providers (FR-09) | ✅ 15 providers: Anthropic, OpenAI, Google Gemini, + 12 OpenAI-compatible (Ollama, NVIDIA NIM, Groq, Together AI, Fireworks AI, DeepSeek, Mistral, Perplexity, Anyscale, Azure OpenAI, OpenRouter, LM Studio, vLLM). Provider-agnostic agent loop with shared tool implementations |
+| Auto-PR on webhook (FR-10) | ✅ Scan→migrate→push branch→open PR→update Check Run. Gated by `AUTO_MIGRATE=true` env var. Usage tracking to `data/usage.jsonl` |
+| Provider CLI (FR-09) | ✅ `evergreen providers` list command + `--provider` flag on migrate |
+| Dockerfile | ✅ Multi-stage build, git-enabled, production-ready |
 
 ## 4. Decision Log (append-only)
 | # | Date | Decision | Why | Ref |
@@ -62,6 +66,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | D9 | 2026-11-13 | Express + `@octokit/webhooks` for GitHub App server (not Probot/Hono) | Battle-tested Octokit ecosystem; webhook sig verification built-in; Probot too opinionated | ADR-8, FSD FR-08.2 |
 | D10 | 2026-11-13 | Check Runs for alerts (not Issues or PR comments) | Best UX: inline annotations on exact lines in PR diff; structured conclusion/summary; idempotent; no notification spam | ADR-9, FSD FR-08.5 |
 | D11 | 2026-11-13 | Shallow clone for repo access (not Contents API) | Scanner needs full file enumeration + line-by-line regex; Contents API is N+1; shallow clone is one `git clone --depth 1` | ADR-10, FSD FR-08.3 |
+| D12 | 2026-11-13 | OpenAI SDK v7 (not v4) | v4 has zod@^3 peer dep conflicting with Agent SDK's zod@^4; v7 supports both `zod@^3.25 \|\| ^4.0` | package.json |
+| D13 | 2026-11-13 | OpenAI-compatible pattern for multi-provider (not per-SDK) | One OpenAI SDK + configurable baseURL covers 12+ providers (Ollama, NIM, Groq, etc.) with zero additional dependencies | FSD FR-09, src/providers/openai-compat.ts |
 
 ## 5. Open Questions (owner: founder)
 - OQ-1: Python vs Go as 2nd language (PRD §10.1)
@@ -70,6 +76,22 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 3 (Release 0.4 complete)
+- **Multi-LLM provider abstraction (FR-09)**: Built a provider-agnostic architecture supporting 15 LLM providers:
+  - Core providers: Anthropic Claude (via @anthropic-ai/sdk), OpenAI (via openai v7 SDK), Google Gemini (via @google/generative-ai).
+  - OpenAI-compatible providers (12): Ollama, NVIDIA NIM, Groq, Together AI, Fireworks AI, DeepSeek, Mistral, Perplexity, Anyscale, Azure OpenAI, OpenRouter, LM Studio, vLLM — all via configurable baseURL on the OpenAI SDK.
+  - `LLMProvider` interface with single `chat()` method. Provider-agnostic agent loop (`runAgentLoop`) drives any LLM through migration using shared tool implementations (Read/Edit/Write/Grep/Glob with path-traversal protection).
+  - Provider registry with factory, preset resolution, and `evergreen providers` CLI command.
+  - `--provider <id>` flag on migrate command + `MIGRATION_PROVIDER` env var.
+- **Auto-PR on webhook (FR-10)**: When `AUTO_MIGRATE=true`, findings trigger: in_progress Check Run → run migration agent → push `evergreen/*` branch → open PR with evidence report → update Check Run with PR link. PR body includes migration summary table, file-by-file status, confidence scores, and review checklist.
+- **Usage tracking (FR-10.5)**: All operations log to `data/usage.jsonl` — provider, model, token counts, cost, findings, PR URL, duration.
+- **Dockerfile**: Multi-stage build (builder + runtime), git-enabled for shallow clones, production `NODE_ENV=production`.
+- **FSD updated**: FR-09 (Multi-LLM Provider Support) and FR-10 (Auto-PR on Webhook) added.
+- **Dependencies**: Added `openai@^7.56.0`, `@google/generative-ai@^0.24.0`. Version bumped to 0.4.0.
+- **Tests**: 46 passing across 10 suites (21 new tests for providers/usage/auto-pr).
+- **Decisions**: D12 (OpenAI v7 SDK for zod 4 compat), D13 (OpenAI-compatible pattern for multi-provider).
+- Next: deploy to Railway/Render, billing integration (0.5), Python language support.
+
 ### 2026-11-13 — Session 2 (Real GitHub App registration + end-to-end verified)
 - **Registered a real GitHub App** ("Evergreen API Scanner", App ID 5745187) on github.com with proper permissions (Checks: read+write, Contents: read-only, Metadata: read-only) and subscribed events (push, pull_request).
 - **Webhook proxy**: Set up smee.io channel (`https://smee.io/yFhCBG2yoj1uoDqA`) as webhook URL for local development forwarding to `localhost:3000/api/github/webhooks`.

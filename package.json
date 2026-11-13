@@ -1,6 +1,6 @@
 {
   "name": "evergreen",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Self-maintaining APIs: when a vendor ships a breaking change, Evergreen migrates every connected codebase automatically.",
   "type": "module",
   "license": "UNLICENSED",
@@ -28,7 +28,9 @@
     "commander": "^15.1.0",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
-    "fast-glob": "^3.3.3"
+    "@google/generative-ai": "^0.24.0",
+    "fast-glob": "^3.3.3",
+    "openai": "^7.56.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

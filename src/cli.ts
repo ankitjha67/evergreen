@@ -8,7 +8,7 @@ import { renderScanTable } from "./scanner/scan.js";
 import { SpecValidationError } from "./types.js";
 
 const program = new Command();
-program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.1.0");
+program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.4.0");
 
 const common = (cmd: Command) =>
   cmd
@@ -40,6 +40,7 @@ common(program.command("migrate").description("Scan, then run the migration agen
   .option("--allow-dirty", "proceed despite uncommitted changes (FR-02.2 override)", false)
   .option("--no-git", "acknowledge non-git target: edits in place")
   .option("--model <id>", "migration model override")
+  .option("--provider <id>", "LLM provider (anthropic, openai, gemini, ollama, groq, etc.)")
   .option("--threshold <n>", "confidence gate 0..1", parseFloat)
   .action(async (o) => {
     try {
@@ -132,6 +133,23 @@ program
       console.error(`Server failed to start: ${e.message}`);
       process.exitCode = 1;
     }
+  });
+
+program
+  .command("providers")
+  .description("List available LLM providers and their configuration status (FR-09)")
+  .action(async () => {
+    const { listAvailableProviders } = await import("./providers/registry.js");
+    const providers = listAvailableProviders();
+    console.log("\nAvailable LLM Providers:\n");
+    console.log("  Status  | ID                | Name");
+    console.log("  --------+-------------------+-------------------------------------");
+    for (const { preset, configured } of providers) {
+      const status = configured ? "  ✓ ready" : "  ✗ needs key";
+      console.log(`${status.padEnd(10)}| ${preset.id.padEnd(18)}| ${preset.name}`);
+    }
+    console.log(`\nTo use a provider: evergreen migrate --spec <file> --provider <id>`);
+    console.log(`Or set MIGRATION_PROVIDER=<id> in your environment.\n`);
   });
 
 function fail(e: unknown): void {
