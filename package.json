@@ -1,6 +1,6 @@
 {
   "name": "evergreen",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Self-maintaining APIs: when a vendor ships a breaking change, Evergreen migrates every connected codebase automatically.",
   "type": "module",
   "license": "UNLICENSED",

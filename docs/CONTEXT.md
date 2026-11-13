@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.8 complete — CI/CD, diff preview, spec fetch, structured logger, 94 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests.
+**Phase:** Release 0.9 complete — multi-spec scan, retry queue, specs CLI, 103 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests.
 
 | Workstream | State |
 |---|---|
@@ -33,7 +33,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Triage (FR-03.2) | ✅ **verified live** — Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
 | Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
 | 2nd changefeed (openai v4) | ✅ **verified live** — assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
-| Tests | ✅ vitest, **94 passing** across 18 suites |
+| Tests | ✅ vitest, **103 passing** across 20 suites |
 | Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
 | Migration agent (FR-04) | ✅ **verified live** — Opus 5.5 migrated both files correctly |
 | Delivery + report (FR-05/06) | ✅ **verified live** — single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
@@ -59,6 +59,9 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | `evergreen diff` CLI | ✅ Migration preview with file grouping, rule details, before/after snippets, `--json` |
 | `evergreen fetch-spec` CLI | ✅ Download + validate spec from HTTP(S) URL (FR-01.3 P1) |
 | Structured logger | ✅ `src/logger.ts` — leveled logging with JSON mode, metadata support |
+| `evergreen specs` CLI | ✅ List bundled specs with language filter and `--json` |
+| `evergreen scan-all` CLI | ✅ Concurrent multi-spec scanning, per-spec results, auto language filter |
+| Webhook retry queue | ✅ Exponential backoff, dead-letter queue, configurable max retries |
 
 ## 4. Decision Log (append-only)
 | # | Date | Decision | Why | Ref |
@@ -84,6 +87,14 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 9 (Release 0.9 — multi-spec scan, retry queue, specs CLI)
+- **`evergreen specs` CLI command**: Lists all bundled changefeed specs with ref, title, languages, rule count, and deadline. Supports `--lang <language>` filter and `--json` output.
+- **`evergreen scan-all` CLI command**: Scans a repository against ALL matching bundled specs concurrently using `Promise.all`. Shows per-spec results with finding counts, rule breakdowns, and clean spec summary. Supports `--lang` filter and `--json`.
+- **Webhook retry queue** (`src/server/retry-queue.ts`): Generic retry queue with exponential backoff for failed webhook handlers. Configurable max retries (default 3), base delay (5s), and dead-letter queue cap (100). Items move to dead-letter after exhausting retries. Stats API for monitoring.
+- **Concurrent scanning**: `scan-all` runs all spec scans in parallel via `Promise.all`, producing identical results to sequential scanning (verified by test).
+- **Version**: 0.9.0. Tests: 103 passing across 20 suites (9 new tests in 2 new suites: retry-queue, scan-all).
+- Next: deploy to Railway/Render, billing integration, Ruby/Go language support, spec registry service.
+
 ### 2026-11-13 — Session 8 (Release 0.8 — CI/CD, diff preview, spec fetch, logger)
 - **GitHub Actions CI/CD** (`.github/workflows/ci.yml`): Matrix build testing Node 20 + 22, typecheck job with `tsc --noEmit`. Runs on push to main and PRs.
 - **`evergreen diff` CLI command**: Migration preview showing findings grouped by file, with before/after snippets from spec rules and migration guidance. Supports `--triage` to filter findings first and `--json` for machine-readable output. No agent run required — scan-only.

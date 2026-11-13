@@ -8,7 +8,7 @@ import { renderScanTable } from "./scanner/scan.js";
 import { SpecValidationError } from "./types.js";
 
 const program = new Command();
-program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.8.0");
+program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.9.0");
 
 const common = (cmd: Command) =>
   cmd
@@ -340,6 +340,130 @@ program
       }
     }
     console.log();
+  });
+
+// evergreen specs — list all bundled changefeed specs
+program
+  .command("specs")
+  .description("List all bundled changefeed specs")
+  .option("--specs-dir <path>", "directory containing specs", "specs")
+  .option("--json", "machine-readable output", false)
+  .option("--lang <language>", "filter by language")
+  .action(async (o) => {
+    const { SpecRegistry } = await import("./registry/specs.js");
+    const { specRef } = await import("./types.js");
+    const registry = new SpecRegistry();
+    await registry.loadFromDirectory(resolve(o.specsDir));
+
+    let specs = registry.allSpecs();
+    if (o.lang) specs = specs.filter((s) => s.languages.includes(o.lang));
+
+    if (o.json) {
+      console.log(JSON.stringify(specs.map((s) => ({
+        ref: specRef(s), vendor: s.vendor, api: s.api, version: s.version,
+        title: s.title, languages: s.languages, rules: s.changes.length, deadline: s.deadline,
+      })), null, 2));
+      return;
+    }
+
+    if (specs.length === 0) {
+      console.log(o.lang ? `\nNo specs found for language: ${o.lang}\n` : "\nNo specs found.\n");
+      return;
+    }
+
+    console.log(`\nBundled Changefeed Specs (${specs.length}):\n`);
+    for (const s of specs) {
+      console.log(`  ${specRef(s)}`);
+      console.log(`    ${s.title}`);
+      console.log(`    Languages: ${s.languages.join(", ")} | Rules: ${s.changes.length}${s.deadline ? ` | Deadline: ${s.deadline}` : ""}`);
+      console.log();
+    }
+  });
+
+// evergreen scan-all — scan a repo against all matching specs
+program
+  .command("scan-all")
+  .description("Scan a repo against all bundled specs matching its language")
+  .option("--repo <path>", "target repository", process.cwd())
+  .option("--specs-dir <path>", "directory containing specs", "specs")
+  .option("--lang <language>", "filter specs by language (auto-detect if omitted)")
+  .option("--json", "machine-readable output", false)
+  .action(async (o) => {
+    try {
+      const { SpecRegistry } = await import("./registry/specs.js");
+      const { specRef } = await import("./types.js");
+      const { scan } = await import("./scanner/scan.js");
+      const { loadRepoConfig } = await import("./config.js");
+
+      const registry = new SpecRegistry();
+      await registry.loadFromDirectory(resolve(o.specsDir));
+
+      const repo = resolve(o.repo);
+      const cfg = await loadRepoConfig(repo);
+
+      // Auto-detect language from repo if not specified
+      let specs = registry.allSpecs();
+      if (o.lang) {
+        specs = specs.filter((s) => s.languages.includes(o.lang));
+      }
+
+      if (specs.length === 0) {
+        console.log("\nNo matching specs found.\n");
+        process.exitCode = 0;
+        return;
+      }
+
+      // Scan concurrently against all specs
+      const results = await Promise.all(
+        specs.map(async (spec) => {
+          const result = await scan(repo, spec, cfg);
+          return { spec, result, ref: specRef(spec) };
+        }),
+      );
+
+      const affected = results.filter((r) => r.result.findings.length > 0);
+
+      if (o.json) {
+        console.log(JSON.stringify({
+          repo,
+          specsScanned: results.length,
+          specsAffected: affected.length,
+          results: results.map((r) => ({
+            specRef: r.ref,
+            findings: r.result.findings.length,
+            scannedFiles: r.result.scannedFiles,
+            durationMs: r.result.durationMs,
+          })),
+        }, null, 2));
+      } else {
+        console.log(`\nScan-all: ${results.length} spec(s) checked against ${repo}\n`);
+
+        if (affected.length === 0) {
+          console.log("  No breaking changes detected. All clear.\n");
+        } else {
+          console.log(`  ${affected.length} spec(s) found affected code:\n`);
+          for (const r of affected) {
+            const byRule = new Map<string, number>();
+            for (const f of r.result.findings) {
+              byRule.set(f.ruleId, (byRule.get(f.ruleId) ?? 0) + 1);
+            }
+            console.log(`  ${r.ref} — ${r.result.findings.length} finding(s) in ${r.result.scannedFiles} files (${r.result.durationMs}ms)`);
+            for (const [rule, count] of byRule) {
+              console.log(`    ${rule}: ${count} match${count > 1 ? "es" : ""}`);
+            }
+            console.log();
+          }
+        }
+
+        const clean = results.filter((r) => r.result.findings.length === 0);
+        if (clean.length > 0) {
+          console.log(`  Clean specs: ${clean.map((r) => r.ref).join(", ")}\n`);
+        }
+      }
+      process.exitCode = 0;
+    } catch (e) {
+      fail(e);
+    }
   });
 
 program
