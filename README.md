@@ -6,7 +6,8 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-46%20passing-brightgreen)](tests/)
+[![Providers](https://img.shields.io/badge/LLM%20providers-15-purple)]()
 [![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)]()
 
 Origin: YC Fall 2026 RFS "Self-Maintaining APIs" — ranked #1 of 107 RFS ideas in our competitive study (zero funded competition, Nov 2026).
@@ -16,6 +17,7 @@ Origin: YC Fall 2026 RFS "Self-Maintaining APIs" — ranked #1 of 107 RFS ideas 
 ## Table of Contents
 
 - [How It Works](#how-it-works)
+- [LLM Providers](#llm-providers)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -27,6 +29,8 @@ Origin: YC Fall 2026 RFS "Self-Maintaining APIs" — ranked #1 of 107 RFS ideas 
   - [Configure Environment](#configure-environment)
   - [Start the Server](#start-the-server)
   - [Local Development with smee.io](#local-development-with-smeeio)
+- [Auto-PR on Webhook](#auto-pr-on-webhook)
+- [Docker Deployment](#docker-deployment)
 - [Changefeed Specs](#changefeed-specs)
   - [Bundled Specs](#bundled-specs)
   - [Writing Your Own Spec](#writing-your-own-spec)
@@ -51,13 +55,13 @@ Vendor publishes spec ──> Evergreen scans repos ──> Agent migrates code 
 
 3. **Triage** *(optional)* — Claude Haiku 5.5 classifies each finding as `affected`, `not_affected`, or `needs_review`, filtering out false positives before the expensive migration step (~$0.20/run).
 
-4. **Migrate** — Claude Opus 5.5 (via Claude Agent SDK) edits *only* the affected files under a strict **minimal-diff contract**: no reformatting, no unrelated changes, no new dependencies unless justified. Every edited file gets a per-file confidence score.
+4. **Migrate** — An LLM agent (default: Claude Opus 5.5, or [any of 15 supported providers](#llm-providers)) edits *only* the affected files under a strict **minimal-diff contract**: no reformatting, no unrelated changes, no new dependencies unless justified. Every edited file gets a per-file confidence score.
 
 5. **Enforce** — The orchestrator reverts any out-of-scope edits and files below the confidence threshold (default: 0.80). Optional verify command (e.g., `node --check`) gates delivery.
 
 6. **Deliver** — One atomic commit on an isolated `evergreen/<vendor>-<version>` branch, plus a `MIGRATION_REPORT.md` with full evidence. PRs only, never pushes. A human reviews and merges.
 
-### GitHub App Mode (Release 0.3)
+### GitHub App Mode
 
 When installed as a GitHub App, Evergreen runs automatically:
 
@@ -71,28 +75,92 @@ Push/PR on GitHub ──> Webhook ──> Shallow clone ──> Scan all specs �
 - Posts findings as **GitHub Check Run annotations** on the exact affected lines
 - Shows a summary table with rules, file counts, migration deadline, and a CTA to run the migration CLI
 
+### Auto-Migrate Mode (Release 0.4)
+
+With `AUTO_MIGRATE=true`, Evergreen goes beyond alerting — it fixes the code too:
+
+```
+Findings detected ──> Migration agent runs ──> Push evergreen/* branch ──> Open PR ──> Update Check Run
+```
+
+- Runs the full migration pipeline using your configured [LLM provider](#llm-providers)
+- Pushes an `evergreen/<vendor>-<api>-<version>` branch with the migration commit
+- Opens a PR with a detailed evidence report (file-by-file status, confidence scores, review checklist)
+- Updates the Check Run with a link to the PR
+- All usage is logged to `data/usage.jsonl` for cost tracking
+
+---
+
+## LLM Providers
+
+Evergreen supports **15 LLM providers** out of the box. Use any model that fits your budget, latency, or data-residency requirements.
+
+```bash
+# List all providers and their configuration status
+npx tsx src/cli.ts providers
+
+# Migrate with a specific provider
+npx tsx src/cli.ts migrate --spec specs/stripe-2025-03-31-basil.json --provider groq
+
+# Or set a default via environment variable
+export MIGRATION_PROVIDER=deepseek
+```
+
+### Supported Providers
+
+| Provider | ID | Default Model | Auth | Type |
+|---|---|---|---|---|
+| **Anthropic Claude** | `anthropic` | `claude-opus-5-5` | `ANTHROPIC_API_KEY` | Cloud |
+| **OpenAI** | `openai` | `gpt-4o` | `OPENAI_API_KEY` | Cloud |
+| **Google Gemini** | `gemini` | `gemini-2.5-pro` | `GOOGLE_API_KEY` | Cloud |
+| **Groq** | `groq` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` | Cloud |
+| **Together AI** | `together` | `Meta-Llama-3.1-70B-Instruct-Turbo` | `TOGETHER_API_KEY` | Cloud |
+| **Fireworks AI** | `fireworks` | `llama-v3p3-70b-instruct` | `FIREWORKS_API_KEY` | Cloud |
+| **DeepSeek** | `deepseek` | `deepseek-chat` | `DEEPSEEK_API_KEY` | Cloud |
+| **NVIDIA NIM** | `nvidia-nim` | `meta/llama-3.3-70b-instruct` | `NVIDIA_API_KEY` | Cloud |
+| **Mistral AI** | `mistral` | `mistral-large-latest` | `MISTRAL_API_KEY` | Cloud |
+| **OpenRouter** | `openrouter` | `anthropic/claude-opus-5-5` | `OPENROUTER_API_KEY` | Cloud |
+| **Perplexity** | `perplexity` | `llama-3.1-sonar-large-128k-online` | `PERPLEXITY_API_KEY` | Cloud |
+| **Anyscale** | `anyscale` | `Meta-Llama-3.1-70B-Instruct` | `ANYSCALE_API_KEY` | Cloud |
+| **Azure OpenAI** | `azure-openai` | `gpt-4o` | `AZURE_OPENAI_API_KEY` | Cloud |
+| **Ollama** | `ollama` | `llama3.3:70b` | None (local) | Local |
+| **LM Studio** | `lmstudio` | `local-model` | None (local) | Local |
+| **vLLM** | `vllm` | `default` | None (local) | Local |
+
+### Provider Architecture
+
+All providers implement a unified `LLMProvider` interface with a single `chat()` method. A provider-agnostic agent loop drives any LLM through the migration using the same shared tool implementations (Read, Edit, Write, Grep, Glob). This means:
+
+- **Same migration quality** — the prompt, tools, and enforcement are identical regardless of provider
+- **Same safety guarantees** — path-traversal protection, confidence gating, and restore-on-failure work with every provider
+- **Zero code changes** — switch providers with a flag or env var, nothing else
+
+The 12 OpenAI-compatible providers (Ollama through Azure) use the OpenAI SDK with a configurable `baseURL`, so they need zero additional dependencies.
+
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     CLI (commander)                     │
-│              scan · migrate · report · serve            │
-└────────┬──────────┬──────────┬──────────┬───────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        CLI (commander)                           │
+│          scan · migrate · report · serve · providers             │
+└────────┬──────────┬──────────┬──────────┬────────────────────────┘
          │          │          │          │
     ┌────▼───┐ ┌────▼───┐ ┌───▼────┐ ┌───▼──────────────┐
     │ Loader │ │Scanner │ │Migrate │ │  GitHub App      │
     │ FR-01  │ │FR-03.1 │ │ FR-04  │ │  Server (FR-08)  │
     └────┬───┘ └────┬───┘ └───┬────┘ └───┬──────────────┘
          │          │         │           │
-    specs/*.json    │    Claude Opus 5.5  │
-                    │    (Agent SDK)      │
-              ┌─────▼─────┐         ┌────▼──────────┐
-              │  Triage   │         │ Webhooks      │
-              │  FR-03.2  │         │ Check Runs    │
-              │ Haiku 5.5 │         │ Shallow Clone │
-              └───────────┘         └───────────────┘
+    specs/*.json    │    ┌────▼─────┐     │
+                    │    │ Provider │     │
+              ┌─────▼──┐│ Registry │ ┌───▼──────────┐
+              │ Triage ││  FR-09   │ │ Auto-PR      │
+              │ FR-03.2││ 15 LLMs  │ │ FR-10        │
+              │Haiku5.5│└──────────┘ │ Webhooks     │
+              └────────┘             │ Check Runs   │
+                                     │ Shallow Clone│
+                                     └──────────────┘
 ```
 
 | Component | Module | Purpose |
@@ -110,8 +178,18 @@ Push/PR on GitHub ──> Webhook ──> Shallow clone ──> Scan all specs �
 | Shallow Clone | `src/github/clone.ts` | `git clone --depth 1` with installation token |
 | Check Runs | `src/github/checks.ts` | Creates Check Runs with per-line annotations |
 | Webhook Server | `src/server/app.ts` | Express + HMAC-SHA256 webhook signature verification |
-| Webhook Handlers | `src/server/webhooks.ts` | push/PR/installation event processing |
-| CLI | `src/cli.ts` | Commander-based CLI: scan, migrate, report, serve |
+| Webhook Handlers | `src/server/webhooks.ts` | push/PR/installation event processing + auto-migrate |
+| Provider Types | `src/providers/types.ts` | `LLMProvider` interface, pricing map, provider config |
+| Agent Loop | `src/providers/agent-loop.ts` | Provider-agnostic agentic migration loop |
+| Shared Tools | `src/providers/tools.ts` | Read/Edit/Write/Grep/Glob with path-traversal jail |
+| Anthropic Provider | `src/providers/anthropic.ts` | Claude via `@anthropic-ai/sdk` Messages API |
+| OpenAI Provider | `src/providers/openai.ts` | GPT-4o/o3 via `openai` SDK (also base for compatible) |
+| OpenAI-Compatible | `src/providers/openai-compat.ts` | 12 provider presets via configurable baseURL |
+| Gemini Provider | `src/providers/gemini.ts` | Gemini via `@google/generative-ai` |
+| Provider Registry | `src/providers/registry.ts` | Factory, preset resolution, env discovery |
+| Auto-PR | `src/github/pr.ts` | Branch push + PR creation with evidence report |
+| Usage Tracking | `src/usage.ts` | JSONL logging for cost/token tracking |
+| CLI | `src/cli.ts` | Commander-based CLI: scan, migrate, report, serve, providers |
 
 ---
 
@@ -122,7 +200,7 @@ Push/PR on GitHub ──> Webhook ──> Shallow clone ──> Scan all specs �
 - **Node.js** >= 20
 - **npm** (comes with Node.js)
 - **Git** (for migration branch delivery)
-- **Claude Code sign-in** or **ANTHROPIC_API_KEY** (for migration and triage — scanning is free)
+- **LLM API key** for migration: `ANTHROPIC_API_KEY` (default), `OPENAI_API_KEY`, `GOOGLE_API_KEY`, or any of [15 supported providers](#llm-providers). Local providers like Ollama need no key. Scanning is free — no AI needed.
 
 ### Installation
 
@@ -167,6 +245,7 @@ Options:
 | `--allow-dirty` | Proceed despite uncommitted changes |
 | `--no-git` | Edit files in place (no branch, no commit) |
 | `--model <id>` | Override the migration model (default: `claude-opus-5-5`) |
+| `--provider <id>` | LLM provider: `anthropic`, `openai`, `gemini`, `ollama`, `groq`, etc. ([full list](#llm-providers)) |
 | `--threshold <n>` | Confidence gate 0..1 (default: 0.80) |
 | `--json` | Machine-readable JSON output |
 
@@ -181,6 +260,14 @@ npx tsx src/cli.ts report --repo /path/to/your/repo
 ```bash
 npx tsx src/cli.ts serve --port 3000 --specs-dir specs
 ```
+
+#### `providers` — List available LLM providers
+
+```bash
+npx tsx src/cli.ts providers
+```
+
+Shows all 15 supported providers with their configuration status (ready vs. needs API key).
 
 ### Running Demos
 
@@ -281,6 +368,56 @@ When you push to any repo where the app is installed, you'll see:
 
 ---
 
+## Auto-PR on Webhook
+
+When `AUTO_MIGRATE=true` is set, Evergreen automatically creates migration PRs when breaking changes are detected:
+
+1. Scanner detects findings → Check Run set to "in progress"
+2. Migration agent runs using your configured LLM provider
+3. Agent commits changes to an `evergreen/<vendor>-<api>-<version>` branch
+4. PR is opened with a detailed evidence report including:
+   - File-by-file migration status and confidence scores
+   - Applied rules per file
+   - Skipped files with reasons
+   - Human review checklist
+5. Check Run updated with link to the PR
+
+```bash
+# Enable auto-migration in your .env
+AUTO_MIGRATE=true
+
+# Optionally configure which provider to use
+MIGRATION_PROVIDER=deepseek  # Default: anthropic
+```
+
+All migration usage (tokens, cost, provider, model, duration) is logged to `data/usage.jsonl` for cost tracking and auditing.
+
+---
+
+## Docker Deployment
+
+Evergreen ships with a production-ready Dockerfile:
+
+```bash
+# Build
+docker build -t evergreen .
+
+# Run the webhook server
+docker run -p 3000:3000 \
+  -e GITHUB_APP_ID=your_app_id \
+  -e GITHUB_PRIVATE_KEY="$(cat your-key.pem)" \
+  -e GITHUB_WEBHOOK_SECRET=your_secret \
+  -e ANTHROPIC_API_KEY=your_key \
+  -e AUTO_MIGRATE=true \
+  -v ./specs:/app/specs \
+  -v ./data:/app/data \
+  evergreen
+```
+
+The image uses a multi-stage build (builder + slim runtime), includes git for shallow cloning, and runs as `NODE_ENV=production`.
+
+---
+
 ## Changefeed Specs
 
 A changefeed spec is a JSON file describing breaking changes in a vendor's API. Evergreen uses these to scan and migrate codebases.
@@ -354,24 +491,38 @@ evergreen/
 │   │   └── report.ts           # MIGRATION_REPORT.md generator
 │   ├── registry/
 │   │   └── specs.ts            # Multi-spec loader for GitHub App
+│   ├── providers/              # Multi-LLM provider abstraction (FR-09)
+│   │   ├── types.ts            # LLMProvider interface, pricing, config
+│   │   ├── agent-loop.ts       # Provider-agnostic migration loop
+│   │   ├── tools.ts            # Shared tools (Read/Edit/Write/Grep/Glob)
+│   │   ├── anthropic.ts        # Anthropic Claude provider
+│   │   ├── openai.ts           # OpenAI provider
+│   │   ├── openai-compat.ts    # 12 OpenAI-compatible presets
+│   │   ├── gemini.ts           # Google Gemini provider
+│   │   └── registry.ts         # Provider factory + discovery
 │   ├── github/
 │   │   ├── client.ts           # GitHub App auth (JWT → installation token)
 │   │   ├── clone.ts            # Shallow clone with token auth
-│   │   └── checks.ts           # Check Run creation + annotations
+│   │   ├── checks.ts           # Check Run creation + annotations
+│   │   └── pr.ts               # Auto-PR creation with evidence report
+│   ├── usage.ts                # Usage tracking (JSONL logger)
 │   └── server/
 │       ├── app.ts              # Express server + webhook signature verification
-│       └── webhooks.ts         # Push/PR/installation event handlers
+│       └── webhooks.ts         # Event handlers + auto-migrate (FR-10)
 ├── specs/                      # Bundled changefeed specs
 │   ├── stripe-2025-03-31-basil.json
 │   └── openai-node-v4.json
-├── tests/                      # Vitest test suite (25 tests)
+├── tests/                      # Vitest test suite (46 tests)
 │   ├── loader.test.ts
 │   ├── scanner.test.ts
 │   ├── git.test.ts
 │   ├── prompt.test.ts
 │   ├── checks.test.ts
 │   ├── registry.test.ts
-│   └── server.test.ts
+│   ├── server.test.ts
+│   ├── providers.test.ts       # Provider registry, tools, pricing tests
+│   ├── usage.test.ts           # Usage tracking tests
+│   └── auto-pr.test.ts         # Auto-PR branch naming, manifest tests
 ├── fixtures/                   # Demo repositories for testing
 │   ├── demo-repo/              # Stripe basil fixture
 │   └── demo-repo-2/            # OpenAI v4 fixture
@@ -384,8 +535,10 @@ evergreen/
 │   └── SYSTEM_DESIGN.md        # System Design (stack, sequences, security)
 ├── scripts/
 │   └── local-webhook-test.ts   # Local webhook testing helper
+├── Dockerfile                  # Multi-stage production Docker image
+├── .dockerignore               # Docker build exclusions
 ├── app-manifest.json           # GitHub App Manifest for registration
-├── .env.example                # Environment variable template
+├── .env.example                # Environment variable template (with provider config)
 ├── CLAUDE.md                   # Working agreement for AI contributors
 ├── tsconfig.json               # TypeScript strict config
 └── package.json                # Dependencies and scripts
@@ -403,7 +556,7 @@ npm test
 npx vitest run --reporter=verbose
 ```
 
-**25 tests** covering:
+**46 tests** across 10 suites:
 - **Loader** — spec validation, schema enforcement, edge cases
 - **Scanner** — pattern matching, multi-rule dedup, file filtering
 - **Git** — porcelain parsing, branch operations, safety checks
@@ -411,6 +564,9 @@ npx vitest run --reporter=verbose
 - **Checks** — annotation mapping, 50-annotation batching, conclusion logic
 - **Registry** — spec loading, language filtering, lookup
 - **Server** — health endpoint, webhook signature verification
+- **Providers** — registry discovery, tool definitions, pricing map, path-traversal prevention, preset validation
+- **Usage** — JSONL logging, multi-record append, directory creation
+- **Auto-PR** — branch naming, specRef formatting, manifest shape validation
 
 ---
 
@@ -441,8 +597,9 @@ Evergreen is designed for zero-trust operation on production codebases:
 | **0.1** — MVP | ✅ Done | CLI scan + migrate, Opus 5.5 agent, branch delivery, evidence report |
 | **0.2** — Triage + Verify | ✅ Done | Haiku triage, verify-command gating, 2nd changefeed (OpenAI v4), 16 tests |
 | **0.3** — GitHub App | ✅ Done | Webhook server, Check Run annotations, multi-spec registry, 25 tests, real app verified |
-| **0.4** — Hosted + Auto-PR | Planned | Deploy to cloud, auto-trigger `migrate` and open PRs, billing integration |
-| **0.5** — Multi-language | Planned | Python, Go support; community spec contributions |
+| **0.4** — Multi-LLM + Auto-PR | ✅ Done | 15 LLM providers, auto-migrate on webhook, Dockerfile, usage tracking, 46 tests |
+| **0.5** — Deploy + Billing | Planned | Deploy to Railway/Render, billing integration, persistent webhook URL |
+| **0.6** — Multi-language | Planned | Python, Go support; community spec contributions |
 | **1.0** — GA | Planned | Vendor portal, marketplace listing, SLA-backed scanning |
 
 ---
@@ -478,11 +635,12 @@ Every source module's header comment names the FR-IDs it implements (e.g., `// F
 ### Tech Stack
 
 - **Runtime:** Node.js >= 20, TypeScript strict, ESM
-- **AI:** Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`), Opus 5.5 (migration), Haiku 5.5 (triage)
+- **AI:** 15 LLM providers via `LLMProvider` abstraction — Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai` v7), Google Gemini (`@google/generative-ai`), plus 12 OpenAI-compatible providers. Claude Agent SDK for triage.
 - **Server:** Express 5, `@octokit/webhooks`, `@octokit/rest`, `@octokit/auth-app`
 - **CLI:** Commander
-- **Tests:** Vitest
+- **Tests:** Vitest (46 tests, 10 suites)
 - **Scanner:** fast-glob + native regex (no AI)
+- **Deploy:** Docker (multi-stage build)
 
 ---
 
