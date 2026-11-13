@@ -1,4 +1,4 @@
-// FR-10.5 — Usage tracking: append usage records to data/usage.jsonl
+// FR-10.5 - Usage tracking: append usage records to data/usage.jsonl
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { TokenUsage } from "./types.js";
@@ -25,7 +25,7 @@ export async function logUsage(record: UsageRecord, baseDir?: string): Promise<v
     await mkdir(dirname(filePath), { recursive: true });
     await appendFile(filePath, JSON.stringify(record) + "\n", "utf8");
   } catch {
-    // Non-critical — don't fail the operation
+    // Non-critical - don't fail the operation
   }
 }
 

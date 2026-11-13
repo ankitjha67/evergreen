@@ -1,4 +1,4 @@
-// FR-09.2 — OpenAI provider (GPT-4o, o1, o3, GPT-5)
+// FR-09.2 - OpenAI provider (GPT-4o, o1, o3, GPT-5)
 import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
 
 export class OpenAIProvider implements LLMProvider {

@@ -1,4 +1,4 @@
-// FR-08.5 — In-memory webhook event log for observability
+// FR-08.5 - In-memory webhook event log for observability
 
 export interface WebhookEvent {
   id: string;

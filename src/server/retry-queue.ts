@@ -1,4 +1,4 @@
-// Webhook retry queue — retries failed webhook handlers with exponential backoff.
+// Webhook retry queue - retries failed webhook handlers with exponential backoff.
 // Dead-letter queue for permanently failed events after max retries.
 
 export interface RetryItem<T = unknown> {

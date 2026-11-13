@@ -23,7 +23,7 @@ describe("Agent loop integration (mock provider)", () => {
     await rm(repoDir, { recursive: true, force: true });
   });
 
-  it("executes Read → Edit → Write manifest flow", async () => {
+  it("executes Read -> Edit -> Write manifest flow", async () => {
     const manifest = JSON.stringify({
       specRef: "stripe@2025-03-31",
       engine: { model: "mock-v1" },

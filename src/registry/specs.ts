@@ -1,4 +1,4 @@
-// FR-08.4 — Bundled spec registry: loads all specs from specs/ at startup
+// FR-08.4 - Bundled spec registry: loads all specs from specs/ at startup
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { BreakingChangeSpec, specRef } from "../types.js";
@@ -16,7 +16,7 @@ export class SpecRegistry {
         const spec = await loadSpec(join(dir, file));
         fresh.set(specRef(spec), spec);
       } catch {
-        // skip invalid specs — log but don't crash
+        // skip invalid specs - log but don't crash
       }
     }
     this.specs = fresh;

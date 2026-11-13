@@ -1,4 +1,4 @@
-// FR-04.2/04.3 — prompt assembly contract
+// FR-04.2/04.3 - prompt assembly contract
 import { describe, it, expect } from "vitest";
 import { buildMigrationPrompt, MANIFEST_RELPATH } from "../src/migrator/prompt.js";
 import { parseVerdicts } from "../src/triage/triage.js";
@@ -40,7 +40,7 @@ describe("FR-04 prompt", () => {
     const p = buildMigrationPrompt(spec, findings);
     expect(p).toContain("src/x.js");
     expect(p).toContain("line 3 [rule-a]");
-    expect(p).toContain("rule-a — A");
+    expect(p).toContain("rule-a - A");
     expect(p).not.toContain("rule-unused"); // only rules with findings are included
     expect(p).toContain(MANIFEST_RELPATH);
     expect(p).toContain("Edit ONLY files in the work list");

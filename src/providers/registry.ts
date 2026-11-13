@@ -1,4 +1,4 @@
-// FR-09.1 — Provider registry: factory, presets, and discovery
+// FR-09.1 - Provider registry: factory, presets, and discovery
 import { LLMProvider, ProviderConfig, ProviderPreset } from "./types.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { OpenAIProvider } from "./openai.js";
@@ -12,7 +12,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     factory: (c) => new AnthropicProvider(c),
     defaultModel: "claude-opus-5-5",
     envKeys: { apiKey: "ANTHROPIC_API_KEY" },
-    description: "Anthropic Claude — frontier models for complex reasoning and code",
+    description: "Anthropic Claude - frontier models for complex reasoning and code",
     supportsToolUse: true,
   },
   {
@@ -21,7 +21,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     factory: (c) => new OpenAIProvider(c),
     defaultModel: "gpt-4o",
     envKeys: { apiKey: "OPENAI_API_KEY" },
-    description: "OpenAI GPT models — GPT-4o, o3, GPT-5",
+    description: "OpenAI GPT models - GPT-4o, o3, GPT-5",
     supportsToolUse: true,
   },
   {
@@ -30,7 +30,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     factory: (c) => new GeminiProvider(c),
     defaultModel: "gemini-2.5-pro",
     envKeys: { apiKey: "GOOGLE_API_KEY" },
-    description: "Google Gemini — multimodal models with large context",
+    description: "Google Gemini - multimodal models with large context",
     supportsToolUse: true,
   },
   // OpenAI-compatible presets

@@ -1,4 +1,4 @@
-// Tests for FR-01.3 — spec fetch from URL
+// Tests for FR-01.3 - spec fetch from URL
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";

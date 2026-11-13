@@ -1,4 +1,4 @@
-// FR-07.2 — Repo config (.evergreen.json) + precedence: CLI flag > repo config > defaults
+// FR-07.2 - Repo config (.evergreen.json) + precedence: CLI flag > repo config > defaults
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { RepoConfig } from "./types.js";
@@ -79,7 +79,7 @@ export function parseYamlConfig(content: string): RepoConfig {
       case "model": config.model = v; break;
       case "threshold": config.confidenceThreshold = parseFloat(v); break;
       case "verify": config.verifyCommand = v; break;
-      case "triage": break; // informational only — CLI flag controls triage
+      case "triage": break; // informational only - CLI flag controls triage
     }
   }
 

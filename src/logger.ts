@@ -1,4 +1,4 @@
-// Structured logger — replaces ad-hoc console.log across the codebase.
+// Structured logger - replaces ad-hoc console.log across the codebase.
 // Levels: debug < info < warn < error. JSON output when LOG_FORMAT=json.
 
 export type LogLevel = "debug" | "info" | "warn" | "error";

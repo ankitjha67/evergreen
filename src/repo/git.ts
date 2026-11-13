@@ -1,4 +1,4 @@
-// FR-02 — Repo targeting & git safety protocol (FSD.md FR-02.2)
+// FR-02 - Repo targeting & git safety protocol (FSD.md FR-02.2)
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -37,7 +37,7 @@ export async function createMigrationBranch(repo: string, vendor: string, versio
       await git(repo, ["rev-parse", "--verify", `refs/heads/${name}`]);
       name = `${base}-${i}`; // exists, try next suffix
     } catch {
-      break; // does not exist — usable
+      break; // does not exist - usable
     }
   }
   await git(repo, ["checkout", "-b", name]);
@@ -84,7 +84,7 @@ export async function restoreFiles(repo: string, paths: string[]): Promise<void>
   if (untracked.length > 0) await git(repo, ["clean", "-f", "--", ...untracked]);
 }
 
-/** Discard ALL uncommitted changes (restore-on-failure path, FR-04.7 — branch is ours). */
+/** Discard ALL uncommitted changes (restore-on-failure path, FR-04.7 - branch is ours). */
 export async function hardRestore(repo: string): Promise<void> {
   await git(repo, ["checkout", "--", "."]);
   await git(repo, ["clean", "-fd", "--exclude=.evergreen"]);

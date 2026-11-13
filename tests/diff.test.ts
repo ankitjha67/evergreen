@@ -1,4 +1,4 @@
-// Tests for `evergreen diff` preview — validates scan grouping and rule mapping
+// Tests for `evergreen diff` preview - validates scan grouping and rule mapping
 import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
 import { loadSpec } from "../src/changefeed/loader.js";

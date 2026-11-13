@@ -1,4 +1,4 @@
-// Tests for FR-07.2 — Repo config loader (.evergreen.json + .evergreen.yaml)
+// Tests for FR-07.2 - Repo config loader (.evergreen.json + .evergreen.yaml)
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";

@@ -35,7 +35,7 @@ describe("RetryQueue", () => {
     const item = queue.getQueue()[0];
     item.nextRetryAt = new Date(0).toISOString();
 
-    // Process twice — should hit max retries
+    // Process twice - should hit max retries
     await (queue as any).processQueue();
     if (queue.pending > 0) {
       queue.getQueue()[0].nextRetryAt = new Date(0).toISOString();

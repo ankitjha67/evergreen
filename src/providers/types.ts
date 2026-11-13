@@ -1,4 +1,4 @@
-// FR-09.1 — Multi-LLM provider abstraction (FSD.md FR-09, SYSTEM_DESIGN.md §9)
+// FR-09.1 - Multi-LLM provider abstraction (FSD.md FR-09, SYSTEM_DESIGN.md §9)
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";

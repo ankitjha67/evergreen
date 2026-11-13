@@ -1,4 +1,4 @@
-// Canonical shared types — SYSTEM_DESIGN.md §4. Changes here update that doc first.
+// Canonical shared types - SYSTEM_DESIGN.md §4. Changes here update that doc first.
 
 // FR-01
 export interface BreakingChangeSpec {
@@ -78,7 +78,7 @@ export interface MigrationOutcome {
   status: "migrated" | "not_affected" | "report_only" | "failed";
 }
 
-// NFR-6 — all four token classes (SYSTEM_DESIGN §6.4)
+// NFR-6 - all four token classes (SYSTEM_DESIGN §6.4)
 export interface TokenUsage {
   inputTokens: number;
   cacheReadTokens: number;

@@ -1,4 +1,4 @@
-// FR-01.3 P1 — Fetch changefeed specs from HTTP(S) URLs.
+// FR-01.3 P1 - Fetch changefeed specs from HTTP(S) URLs.
 import { writeFile, mkdir } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { loadSpec } from "./loader.js";
@@ -12,7 +12,7 @@ export interface FetchResult {
 
 export async function fetchSpec(url: string, outDir?: string): Promise<FetchResult> {
   if (!/^https?:\/\//i.test(url)) {
-    throw new Error(`Invalid spec URL: ${url} — must be http:// or https://`);
+    throw new Error(`Invalid spec URL: ${url} - must be http:// or https://`);
   }
 
   const res = await fetch(url);
@@ -22,12 +22,12 @@ export async function fetchSpec(url: string, outDir?: string): Promise<FetchResu
 
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("json") && !contentType.includes("text")) {
-    throw new Error(`Unexpected content-type from ${url}: ${contentType} — expected JSON`);
+    throw new Error(`Unexpected content-type from ${url}: ${contentType} - expected JSON`);
   }
 
   const body = await res.text();
 
-  // Validate before saving — parse + validate through the standard loader path
+  // Validate before saving - parse + validate through the standard loader path
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);

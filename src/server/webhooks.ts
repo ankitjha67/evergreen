@@ -1,4 +1,4 @@
-// FR-08.2/08.4/10 — GitHub webhook event handlers + auto-migrate
+// FR-08.2/08.4/10 - GitHub webhook event handlers + auto-migrate
 import { Octokit } from "@octokit/rest";
 import { BreakingChangeSpec, ScanResult, specRef } from "../types.js";
 import { SpecRegistry } from "../registry/specs.js";
@@ -142,7 +142,7 @@ async function scanRepo(ctx: WebhookContext, ref: RepoRef): Promise<void> {
       ctx.log("debug", `No findings in ${fullName} for any spec`);
     }
 
-    // FR-10 — Auto-migrate: if enabled and findings exist, run migration and open PR
+    // FR-10 - Auto-migrate: if enabled and findings exist, run migration and open PR
     if (anyFindings && process.env.AUTO_MIGRATE === "true") {
       for (const spec of specs) {
         const scanResult: ScanResult = await scan(cloneDir, spec, {});
@@ -167,7 +167,7 @@ async function scanRepo(ctx: WebhookContext, ref: RepoRef): Promise<void> {
   }
 }
 
-// FR-10 — Auto-migrate + PR creation
+// FR-10 - Auto-migrate + PR creation
 async function autoMigrate(
   ctx: WebhookContext,
   octokit: Octokit,
@@ -236,7 +236,7 @@ async function autoMigrate(
     },
   });
 
-  // FR-10.5 — Log usage
+  // FR-10.5 - Log usage
   await logUsage({
     timestamp: new Date().toISOString(),
     event: "auto-pr",
