@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createAppOctokit, AppConfig } from "../github/client.js";
 import { SpecRegistry } from "../registry/specs.js";
 import { handlePush, handlePullRequest, handleInstallation, WebhookContext } from "./webhooks.js";
+import { getUsageSummary } from "../usage.js";
 
 export interface ServerConfig {
   port: number;
@@ -98,6 +99,16 @@ export async function createServer(config: ServerConfig) {
   app.get("/ready", (_req, res) => {
     const ready = registry.size > 0;
     res.status(ready ? 200 : 503).json({ ready, specs: registry.size });
+  });
+
+  // Usage stats API
+  app.get("/api/usage", async (_req, res) => {
+    try {
+      const summary = await getUsageSummary();
+      res.json(summary);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Webhook endpoint
