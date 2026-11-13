@@ -60,6 +60,15 @@ export function loadServerConfig(): ServerConfig {
 
 function createRateLimiter(maxRequests: number, windowMs: number) {
   const hits = new Map<string, number[]>();
+  const cleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of hits) {
+      const live = timestamps.filter((t) => now - t < windowMs);
+      if (live.length === 0) hits.delete(key);
+      else hits.set(key, live);
+    }
+  }, windowMs);
+  cleanup.unref();
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const key = req.ip ?? "unknown";
     const now = Date.now();
@@ -157,6 +166,7 @@ export async function createServer(config: ServerConfig) {
     res.setHeader("X-XSS-Protection", "1; mode=block");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'");
     next();
   });
 

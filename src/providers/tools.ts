@@ -119,8 +119,14 @@ async function toolWrite(root: string, filePath: string, content: string): Promi
 }
 
 async function toolGrep(root: string, pattern: string, glob?: string): Promise<string> {
+  if (pattern.length > 500) throw new Error("Regex pattern too long (max 500 chars)");
   const files = await fg(glob ?? "**/*", { cwd: root, dot: false, ignore: ["**/node_modules/**", "**/.git/**"] });
-  const regex = new RegExp(pattern);
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch (e: any) {
+    throw new Error(`Invalid regex: ${e.message}`);
+  }
   const results: string[] = [];
   for (const f of files.slice(0, 500)) {
     try {
