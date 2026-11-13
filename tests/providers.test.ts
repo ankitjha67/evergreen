@@ -111,6 +111,24 @@ describe("Provider dispatch in orchestrator", () => {
   });
 });
 
+describe("Provider default model resolution", () => {
+  it("each provider preset has a non-empty defaultModel", () => {
+    const providers = listProviders();
+    for (const p of providers) {
+      expect(p.defaultModel, `${p.id} missing defaultModel`).toBeTruthy();
+    }
+  });
+
+  it("non-Anthropic providers have non-Claude default models", () => {
+    const providers = listProviders();
+    for (const p of providers) {
+      if (p.id !== "anthropic") {
+        expect(p.defaultModel, `${p.id} should not default to claude`).not.toMatch(/^claude-/);
+      }
+    }
+  });
+});
+
 describe("OpenAI-compat presets", () => {
   it("has at least 10 presets", () => {
     expect(Object.keys(OPENAI_COMPAT_PRESETS).length).toBeGreaterThanOrEqual(10);

@@ -11,7 +11,7 @@ import { scan } from "./scanner/scan.js";
 import { triage, actionable } from "./triage/triage.js";
 import { buildMigrationPrompt } from "./migrator/prompt.js";
 import { runMigrationAgent, runProviderMigration } from "./migrator/agent.js";
-import { getProvider } from "./providers/registry.js";
+import { getProvider, listProviders } from "./providers/registry.js";
 import * as git from "./repo/git.js";
 import { renderReport } from "./report/report.js";
 
@@ -101,8 +101,11 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
     // FR-04 — agent run (Agent SDK for Anthropic, provider-agnostic loop for others)
     const providerId = opts.provider ?? cfg.provider;
     const useProviderLoop = providerId && providerId !== "anthropic";
+    const resolvedModel = useProviderLoop && !opts.model && !cfg.model
+      ? (listProviders().find((p) => p.id === providerId)?.defaultModel ?? model)
+      : model;
     const run = useProviderLoop
-      ? await runProviderMigration(repo, prompt, getProvider(providerId), model)
+      ? await runProviderMigration(repo, prompt, getProvider(providerId), resolvedModel)
       : await runMigrationAgent(repo, prompt, { model });
     outcome.usage = run.usage;
 

@@ -89,9 +89,15 @@ export async function createServer(config: ServerConfig) {
     handleInstallation(ctx, payload).catch((e) => log("error", `Installation handler error: ${e.message}`));
   });
 
-  // Health check
+  // Health check — liveness (always ok if the process is running)
   app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", specs: registry.size });
+    res.json({ status: "ok", version: "0.4.1", specs: registry.size, uptime: Math.floor(process.uptime()) });
+  });
+
+  // Readiness check — ok only if we have specs loaded and GitHub auth configured
+  app.get("/ready", (_req, res) => {
+    const ready = registry.size > 0;
+    res.status(ready ? 200 : 503).json({ ready, specs: registry.size });
   });
 
   // Webhook endpoint

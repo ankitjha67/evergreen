@@ -195,11 +195,12 @@ async function autoMigrate(
 
   const provider = resolveProvider({});
   const prompt = buildMigrationPrompt(spec, scanResult.findings);
+  const systemPrompt = "You are Evergreen's migration engine. Follow the user's instructions exactly.";
 
   const result = await runAgentLoop(
     provider,
+    systemPrompt,
     prompt,
-    `Migrate the codebase according to the instructions. Work list has ${scanResult.findings.length} findings.`,
     cloneDir,
     provider.defaultModel,
   );
