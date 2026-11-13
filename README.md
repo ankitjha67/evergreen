@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-59%20passing-brightgreen)](tests/)
 [![Providers](https://img.shields.io/badge/LLM%20providers-15-purple)]()
 [![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)]()
 
@@ -437,6 +437,7 @@ The image uses a multi-stage build (builder + slim runtime), includes git for sh
 |---|---|---|
 | `GET /healthz` | Liveness — process is running | `200` with version, uptime, spec count |
 | `GET /ready` | Readiness — specs loaded, ready to serve | `200` if specs > 0, `503` otherwise |
+| `GET /api/usage` | Usage stats — aggregated from `data/usage.jsonl` | `200` with by-event, by-provider, by-repo breakdowns, cost totals, recent events |
 
 ---
 

@@ -76,6 +76,13 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 4 (continued — integration tests + usage API)
+- **Mock LLM provider** (`tests/mock-provider.ts`): Scriptable provider that simulates tool-calling LLM for deterministic testing. `createMigrationMockScript()` generates a Read→Edit→Write manifest sequence.
+- **Agent loop integration tests** (`tests/agent-loop.test.ts`): 5 tests exercising the full provider-agnostic pipeline with real filesystem operations — file edit verification, manifest writing, token accumulation, maxTurns enforcement, tool error handling, path traversal blocking.
+- **Usage stats API**: `getUsageSummary()` in `src/usage.ts` aggregates `data/usage.jsonl` into by-event, by-provider, by-repo breakdowns with cost totals. `GET /api/usage` endpoint on the webhook server.
+- Tests: 59 passing across 11 suites (7 new).
+- Next: deploy to Railway/Render (persistent webhook URL), billing integration, Python language support.
+
 ### 2026-11-13 — Session 4 (v0.4.1 — bugfixes + deployment)
 - **Fixed model resolution bug**: `--provider openai` (or any non-Anthropic) no longer falls back to `claude-opus-5-5`; the orchestrator now resolves the provider's default model (e.g. `gpt-4o` for OpenAI, `gemini-2.5-pro` for Gemini) when no explicit `--model` is given.
 - **Fixed webhook prompt order**: `autoMigrate()` in webhooks.ts had system/user prompts swapped in the `runAgentLoop` call — the detailed migration prompt was the system message and the brief instruction was the user message.
