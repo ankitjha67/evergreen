@@ -102,3 +102,26 @@ describe("getUsageSummary", () => {
     await rm(dir, { recursive: true, force: true });
   });
 });
+
+describe("getUsageSummary with populated data", () => {
+  it("limits recent events to the requested count", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "evergreen-usage-test-"));
+    const base: UsageRecord = {
+      timestamp: "2026-11-13T00:00:00.000Z",
+      event: "scan",
+      repo: "owner/repo",
+      specRef: "stripe@2025-03-31",
+      provider: "anthropic",
+      model: "claude-opus-5-5",
+      usage: { inputTokens: 100, cacheReadTokens: 0, cacheCreationTokens: 0, outputTokens: 50, costUSD: 0.01 },
+    };
+
+    for (let i = 0; i < 5; i++) await logUsage({ ...base, timestamp: `2026-11-13T0${i}:00:00.000Z` }, dir);
+
+    const summary = await getUsageSummary(dir, 3);
+    expect(summary.totalEvents).toBe(5);
+    expect(summary.recentEvents.length).toBeLessThanOrEqual(3);
+
+    await rm(dir, { recursive: true, force: true });
+  });
+});

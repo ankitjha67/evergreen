@@ -8,7 +8,7 @@ import { renderScanTable } from "./scanner/scan.js";
 import { SpecValidationError } from "./types.js";
 
 const program = new Command();
-program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.4.1");
+program.name("evergreen").description("Self-maintaining APIs: scan and migrate codebases when API vendors ship breaking changes.").version("0.5.0");
 
 const common = (cmd: Command) =>
   cmd
@@ -134,6 +134,45 @@ program
       console.error(`Server failed to start: ${e.message}`);
       process.exitCode = 1;
     }
+  });
+
+program
+  .command("usage")
+  .description("Show usage statistics (scans, migrations, costs)")
+  .option("--json", "machine-readable output", false)
+  .option("--limit <n>", "recent events to show", "10")
+  .action(async (o) => {
+    const { getUsageSummary } = await import("./usage.js");
+    const summary = await getUsageSummary(undefined, parseInt(o.limit, 10));
+    if (o.json) {
+      console.log(JSON.stringify(summary, null, 2));
+      return;
+    }
+    if (summary.totalEvents === 0) {
+      console.log("\nNo usage data yet. Run `evergreen scan` or `evergreen migrate` to get started.\n");
+      return;
+    }
+    console.log(`\nEvergreen Usage Summary`);
+    console.log("─".repeat(50));
+    console.log(`  Total events:  ${summary.totalEvents}`);
+    console.log(`  Total cost:    $${summary.totalCostUSD.toFixed(4)}`);
+    console.log(`  Tokens:        ${summary.totalTokens.input.toLocaleString()} in / ${summary.totalTokens.output.toLocaleString()} out`);
+    console.log(`  PRs created:   ${summary.prsCreated}`);
+    console.log(`\nBy event type:`);
+    for (const [k, v] of Object.entries(summary.byEvent)) console.log(`  ${k.padEnd(15)} ${v}`);
+    console.log(`\nBy provider:`);
+    for (const [k, v] of Object.entries(summary.byProvider)) console.log(`  ${k.padEnd(15)} ${v}`);
+    console.log(`\nBy repository:`);
+    for (const [k, v] of Object.entries(summary.byRepo)) console.log(`  ${k.padEnd(15)} ${v}`);
+    if (summary.recentEvents.length > 0) {
+      const count = Math.min(summary.recentEvents.length, parseInt(o.limit, 10));
+      console.log(`\nRecent events (last ${count}):`);
+      for (const e of summary.recentEvents.slice(0, count)) {
+        const ts = e.timestamp.replace("T", " ").replace(/\.\d+Z$/, "Z");
+        console.log(`  ${ts}  ${e.event.padEnd(10)} ${e.repo}  $${e.usage.costUSD.toFixed(4)}  ${e.provider}`);
+      }
+    }
+    console.log();
   });
 
 program

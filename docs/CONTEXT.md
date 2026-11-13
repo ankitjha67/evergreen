@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change → update FSD first. Structural change → ARCHITECTURE/SYSTEM_DESIGN first. New decision → log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.4 complete — multi-LLM provider support (15 providers), auto-PR on webhook, Dockerfile, usage tracking, 46 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests.
+**Phase:** Release 0.5 complete — production-readiness: CLI usage command, graceful shutdown, request logging, rate limiting, 61 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests.
 
 | Workstream | State |
 |---|---|
@@ -76,6 +76,14 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional — D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-13 — Session 5 (Release 0.5 — production readiness)
+- **`evergreen usage` CLI command**: Displays formatted usage summary (total events, cost, tokens, PRs, breakdowns by event/provider/repo, recent events list). Supports `--json` and `--limit <n>` flags.
+- **Graceful shutdown**: Server handles SIGTERM/SIGINT with 10s drain timeout — clean shutdown for Railway/Render cloud deploys.
+- **Request logging middleware**: Every HTTP request logged with method, path, status code, and duration in ms.
+- **Webhook rate limiting**: In-memory sliding-window rate limiter (60 req/min per IP) on the webhook endpoint. Returns 429 with `retryAfterMs` when exceeded.
+- **Version**: 0.5.0. Tests: 61 passing across 11 suites (2 new).
+- Next: deploy to Railway/Render (persistent webhook URL), billing integration, Python language support, admin dashboard.
+
 ### 2026-11-13 — Session 4 (continued — integration tests + usage API)
 - **Mock LLM provider** (`tests/mock-provider.ts`): Scriptable provider that simulates tool-calling LLM for deterministic testing. `createMigrationMockScript()` generates a Read→Edit→Write manifest sequence.
 - **Agent loop integration tests** (`tests/agent-loop.test.ts`): 5 tests exercising the full provider-agnostic pipeline with real filesystem operations — file edit verification, manifest writing, token accumulation, maxTurns enforcement, tool error handling, path traversal blocking.

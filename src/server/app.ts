@@ -55,6 +55,22 @@ export function loadServerConfig(): ServerConfig {
   };
 }
 
+function createRateLimiter(maxRequests: number, windowMs: number) {
+  const hits = new Map<string, number[]>();
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = req.ip ?? "unknown";
+    const now = Date.now();
+    const timestamps = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (timestamps.length >= maxRequests) {
+      res.status(429).json({ error: "Too many requests", retryAfterMs: windowMs - (now - timestamps[0]) });
+      return;
+    }
+    timestamps.push(now);
+    hits.set(key, timestamps);
+    next();
+  };
+}
+
 export async function createServer(config: ServerConfig) {
   const log = createLogger(config.logLevel);
   const app = express();
@@ -90,9 +106,19 @@ export async function createServer(config: ServerConfig) {
     handleInstallation(ctx, payload).catch((e) => log("error", `Installation handler error: ${e.message}`));
   });
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      log("info", `${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    });
+    next();
+  });
+
   // Health check — liveness (always ok if the process is running)
   app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", version: "0.4.1", specs: registry.size, uptime: Math.floor(process.uptime()) });
+    res.json({ status: "ok", version: "0.5.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
   });
 
   // Readiness check — ok only if we have specs loaded and GitHub auth configured
@@ -111,8 +137,11 @@ export async function createServer(config: ServerConfig) {
     }
   });
 
+  // Simple in-memory rate limiter for webhook endpoint
+  const rateLimiter = createRateLimiter(60, 60_000); // 60 requests per minute
+
   // Webhook endpoint
-  app.post("/api/github/webhooks", express.raw({ type: "application/json" }), async (req, res) => {
+  app.post("/api/github/webhooks", rateLimiter, express.raw({ type: "application/json" }), async (req, res) => {
     const signature = req.headers["x-hub-signature-256"] as string;
     const event = req.headers["x-github-event"] as string;
     const deliveryId = req.headers["x-github-delivery"] as string;
@@ -148,9 +177,27 @@ export async function startServer(config?: ServerConfig): Promise<void> {
   const cfg = config ?? loadServerConfig();
   const { app } = await createServer(cfg);
 
-  app.listen(cfg.port, () => {
+  const server = app.listen(cfg.port, () => {
     console.log(`Evergreen GitHub App server listening on port ${cfg.port}`);
     console.log(`Webhook URL: POST http://localhost:${cfg.port}/api/github/webhooks`);
     console.log(`Health check: GET http://localhost:${cfg.port}/healthz`);
   });
+
+  let shuttingDown = false;
+  const gracefulShutdown = (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n${signal} received — shutting down gracefully...`);
+    server.close(() => {
+      console.log("Server closed. Goodbye.");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error("Graceful shutdown timed out after 10s, forcing exit.");
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }

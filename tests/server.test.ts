@@ -95,6 +95,12 @@ describe("FR-08.2 Server", () => {
     expect(registry.size > 0).toBe(true);
   });
 
+  it("server creates successfully with all middleware", async () => {
+    const { app, registry } = await createServer(makeConfig());
+    expect(app).toBeDefined();
+    expect(registry.size).toBeGreaterThanOrEqual(2);
+  });
+
   it("webhook signature computation matches expected format", () => {
     const body = JSON.stringify({ action: "opened" });
     const signature = sign(body, TEST_SECRET);
