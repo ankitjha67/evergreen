@@ -96,6 +96,21 @@ describe("Provider Registry", () => {
   });
 });
 
+describe("runProviderMigration export", () => {
+  it("is importable from agent module", async () => {
+    const mod = await import("../src/migrator/agent.js");
+    expect(typeof mod.runProviderMigration).toBe("function");
+  });
+});
+
+describe("Provider dispatch in orchestrator", () => {
+  it("orchestrator imports getProvider from registry", async () => {
+    const mod = await import("../src/orchestrator.js");
+    expect(typeof mod.migrate).toBe("function");
+    expect(typeof mod.scanOnly).toBe("function");
+  });
+});
+
 describe("OpenAI-compat presets", () => {
   it("has at least 10 presets", () => {
     expect(Object.keys(OPENAI_COMPAT_PRESETS).length).toBeGreaterThanOrEqual(10);

@@ -53,6 +53,7 @@ common(program.command("migrate").description("Scan, then run the migration agen
         allowDirty: o.allowDirty,
         noGit: o.git === false,
         model: o.model,
+        provider: o.provider,
         threshold: o.threshold,
         json: o.json,
       });

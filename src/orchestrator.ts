@@ -10,7 +10,8 @@ import { loadRepoConfig, DEFAULTS } from "./config.js";
 import { scan } from "./scanner/scan.js";
 import { triage, actionable } from "./triage/triage.js";
 import { buildMigrationPrompt } from "./migrator/prompt.js";
-import { runMigrationAgent } from "./migrator/agent.js";
+import { runMigrationAgent, runProviderMigration } from "./migrator/agent.js";
+import { getProvider } from "./providers/registry.js";
 import * as git from "./repo/git.js";
 import { renderReport } from "./report/report.js";
 
@@ -97,8 +98,12 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
   }
 
   try {
-    // FR-04 — agent run
-    const run = await runMigrationAgent(repo, prompt, { model });
+    // FR-04 — agent run (Agent SDK for Anthropic, provider-agnostic loop for others)
+    const providerId = opts.provider ?? cfg.provider;
+    const useProviderLoop = providerId && providerId !== "anthropic";
+    const run = useProviderLoop
+      ? await runProviderMigration(repo, prompt, getProvider(providerId), model)
+      : await runMigrationAgent(repo, prompt, { model });
     outcome.usage = run.usage;
 
     if (!run.manifest) {

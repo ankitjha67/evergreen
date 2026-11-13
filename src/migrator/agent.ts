@@ -79,6 +79,23 @@ export async function runMigrationAgent(
   return { manifest, manifestProblems: problems, usage, finalText };
 }
 
+/** FR-09 — Run migration via the provider-agnostic agent loop (non-Anthropic providers). */
+export async function runProviderMigration(
+  repo: string,
+  prompt: string,
+  provider: import("../providers/types.js").LLMProvider,
+  model: string,
+  opts: { maxTurns?: number } = {},
+): Promise<AgentRunResult> {
+  const { runAgentLoop } = await import("../providers/agent-loop.js");
+  const systemPrompt = "You are Evergreen's migration engine. Follow the user's instructions exactly.";
+  const { usage, finalText } = await runAgentLoop(provider, systemPrompt, prompt, repo, model, {
+    maxTurns: opts.maxTurns,
+  });
+  const { manifest, problems } = await readManifest(repo);
+  return { manifest, manifestProblems: problems, usage, finalText };
+}
+
 // FR-04.4 — manifest validation: missing/invalid manifest => failed run
 async function readManifest(repo: string): Promise<{ manifest?: ChangeManifest; problems: string[] }> {
   const problems: string[] = [];
