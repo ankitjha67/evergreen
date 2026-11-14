@@ -1,4 +1,4 @@
-// FR-08.2 — Express webhook server for Evergreen GitHub App
+// FR-08.2 - Express webhook server for Evergreen GitHub App
 import express from "express";
 import { Webhooks } from "@octokit/webhooks";
 import { join, resolve } from "node:path";
@@ -60,6 +60,15 @@ export function loadServerConfig(): ServerConfig {
 
 function createRateLimiter(maxRequests: number, windowMs: number) {
   const hits = new Map<string, number[]>();
+  const cleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of hits) {
+      const live = timestamps.filter((t) => now - t < windowMs);
+      if (live.length === 0) hits.delete(key);
+      else hits.set(key, live);
+    }
+  }, windowMs);
+  cleanup.unref();
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const key = req.ip ?? "unknown";
     const now = Date.now();
@@ -150,6 +159,17 @@ export async function createServer(config: ServerConfig) {
     eventLog.push(evt);
   });
 
+  // Security headers
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'");
+    next();
+  });
+
   // Request logging middleware
   app.use((req, res, next) => {
     const start = Date.now();
@@ -160,12 +180,12 @@ export async function createServer(config: ServerConfig) {
     next();
   });
 
-  // Health check — liveness (always ok if the process is running)
+  // Health check - liveness (always ok if the process is running)
   app.get("/healthz", (_req, res) => {
     res.json({ status: "ok", version: "0.9.0", specs: registry.size, uptime: Math.floor(process.uptime()) });
   });
 
-  // Readiness check — ok only if we have specs loaded and GitHub auth configured
+  // Readiness check - ok only if we have specs loaded and GitHub auth configured
   app.get("/ready", (_req, res) => {
     const ready = registry.size > 0;
     res.status(ready ? 200 : 503).json({ ready, specs: registry.size });
@@ -198,7 +218,8 @@ export async function createServer(config: ServerConfig) {
 
   // Webhook event log API
   app.get("/api/events", (req, res) => {
-    const limit = parseInt((req.query.limit as string) ?? "50", 10);
+    const raw = parseInt((req.query.limit as string) ?? "50", 10);
+    const limit = Number.isNaN(raw) ? 50 : Math.min(Math.max(raw, 1), 500);
     res.json({ events: eventLog.recent(limit), stats: eventLog.stats() });
   });
 
@@ -280,7 +301,7 @@ export async function startServer(config?: ServerConfig): Promise<void> {
   const gracefulShutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`\n${signal} received — shutting down gracefully...`);
+    console.log(`\n${signal} received - shutting down gracefully...`);
     server.close(() => {
       console.log("Server closed. Goodbye.");
       process.exit(0);

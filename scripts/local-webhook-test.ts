@@ -1,4 +1,4 @@
-// Local webhook test — simulates a GitHub push webhook hitting the server
+// Local webhook test - simulates a GitHub push webhook hitting the server
 // Usage: npx tsx scripts/local-webhook-test.ts
 import { createHmac } from "node:crypto";
 
@@ -36,7 +36,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Test 2: Webhook with bad signature → should get 401
+  // Test 2: Webhook with bad signature -> should get 401
   console.log("2. Testing webhook with bad signature...");
   try {
     const badRes = await fetch(`http://localhost:${PORT}/api/github/webhooks`, {
@@ -57,7 +57,7 @@ async function main() {
     console.log(`   ✗ Request failed: ${e.message}\n`);
   }
 
-  // Test 3: Webhook with valid signature → should get 202
+  // Test 3: Webhook with valid signature -> should get 202
   console.log("3. Testing webhook with valid signature...");
   try {
     const goodRes = await fetch(`http://localhost:${PORT}/api/github/webhooks`, {
@@ -78,7 +78,7 @@ async function main() {
     console.log(`   ✗ Request failed: ${e.message}\n`);
   }
 
-  // Test 4: Webhook with missing signature → should get 401
+  // Test 4: Webhook with missing signature -> should get 401
   console.log("4. Testing webhook with no signature...");
   try {
     const noSigRes = await fetch(`http://localhost:${PORT}/api/github/webhooks`, {

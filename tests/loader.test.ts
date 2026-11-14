@@ -1,4 +1,4 @@
-// FR-01.2 — spec validation
+// FR-01.2 - spec validation
 import { describe, it, expect } from "vitest";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

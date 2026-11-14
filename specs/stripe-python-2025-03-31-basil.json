@@ -53,7 +53,7 @@
         "notes": "The StripeClient pattern supports per-request API keys and is thread-safe. Detect both the api_key assignment and direct module-level resource access."
       },
       "replace": {
-        "guidance": "Replace 'stripe.api_key = key' + 'stripe.Charge.create(...)' with 'client = stripe.StripeClient(key)' + 'client.charges.create(...)'. The resource names change from PascalCase class methods to snake_case client attributes: Charge→charges, Customer→customers, PaymentIntent→payment_intents, etc. Keep the StripeClient instantiation near the top of the module or in a factory function.",
+        "guidance": "Replace 'stripe.api_key = key' + 'stripe.Charge.create(...)' with 'client = stripe.StripeClient(key)' + 'client.charges.create(...)'. The resource names change from PascalCase class methods to snake_case client attributes: Charge->charges, Customer->customers, PaymentIntent->payment_intents, etc. Keep the StripeClient instantiation near the top of the module or in a factory function.",
         "before": "stripe.api_key = os.environ['STRIPE_KEY']\ncharge = stripe.Charge.create(amount=1000, currency='usd')",
         "after": "client = stripe.StripeClient(os.environ['STRIPE_KEY'])\ncharge = client.charges.create(params={'amount': 1000, 'currency': 'usd'})",
         "docsUrl": "https://docs.stripe.com/development/quickstart?lang=python"

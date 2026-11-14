@@ -1,4 +1,4 @@
-// Tests for FR-10.5 — Usage tracking
+// Tests for FR-10.5 - Usage tracking
 import { describe, it, expect } from "vitest";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";

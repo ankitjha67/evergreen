@@ -1,13 +1,13 @@
 # Functional Specification Document (FSD)
-## Evergreen — Self-Maintaining APIs
-**Version:** 1.0 | **Date:** 2026-11-13 | **Status:** Draft — living document
+## Evergreen -- Self-Maintaining APIs
+**Version:** 1.0 | **Date:** 2026-11-13 | **Status:** Draft -- living document
 **Doc ID:** FSD | Upstream: [PRD.md](PRD.md) | Downstream: [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md), source code (modules carry FR-IDs)
 
 Every functional requirement below has a stable **FR-ID**. Code modules reference these IDs in their header comment. Changes to behavior MUST update this document first (see [CONTEXT.md](CONTEXT.md) working agreement).
 
 ---
 
-## FR-01 — Changefeed: BreakingChangeSpec
+## FR-01 -- Changefeed: BreakingChangeSpec
 
 ### FR-01.1 Spec format
 A changefeed is a JSON document describing one versioned set of breaking changes from one vendor.
@@ -27,14 +27,14 @@ A changefeed is a JSON document describing one versioned set of breaking changes
       "id": "stripe-basil-001",          // stable rule id, unique within spec
       "severity": "breaking",            // breaking | deprecation | behavioral
       "title": "Upcoming invoice endpoints replaced by Create Preview Invoice",
-      "description": "…what changed and why…",
+      "description": "...what changed and why...",
       "detect": {
         "patterns": ["invoices\\.retrieveUpcoming", "invoices\\.listUpcomingLines"],  // regex, case-sensitive
         "filePatterns": ["**/*.js", "**/*.ts", "**/*.mjs", "**/*.cjs"],
-        "notes": "…hints for the triage/migration agent…"
+        "notes": "...hints for the triage/migration agent..."
       },
       "replace": {
-        "guidance": "…prose instructions for the migration agent…",
+        "guidance": "...prose instructions for the migration agent...",
         "before": "const upcoming = await stripe.invoices.retrieveUpcoming({ customer });",
         "after": "const preview = await stripe.invoices.createPreview({ customer });",
         "docsUrl": "https://docs.stripe.com/api/invoices/create_preview"
@@ -46,7 +46,7 @@ A changefeed is a JSON document describing one versioned set of breaking changes
 
 ### FR-01.2 Validation
 - Loader MUST validate: required fields present, `changes[].id` unique, every `detect.patterns` entry compiles as a JS regex, `severity` in enum.
-- Invalid spec → process exits non-zero with each violation listed as `specPath: message`. No partial loading.
+- Invalid spec -> process exits non-zero with each violation listed as `specPath: message`. No partial loading.
 
 ### FR-01.3 Sources
 - MVP: local file path via `--spec`.
@@ -54,16 +54,16 @@ A changefeed is a JSON document describing one versioned set of breaking changes
 
 ---
 
-## FR-02 — Repo Targeting & Git Safety
+## FR-02 -- Repo Targeting & Git Safety
 
 ### FR-02.1 Target resolution
 - `--repo <path>` points at a directory. If omitted, CWD.
 - Target MUST exist and contain files matching at least one `filePatterns` glob, else exit "nothing to scan."
 
 ### FR-02.2 Git safety protocol (hard requirements)
-1. If target is a git repo with uncommitted changes → **refuse** to run `migrate` (scan is always allowed) unless `--allow-dirty`.
-2. Migration edits happen on a **new branch** `evergreen/<vendor>-<version>` created from current HEAD (suffix `-2`, `-3`… if taken).
-3. If target is NOT a git repo → `migrate` requires `--no-git` acknowledgment; edits in place, report only.
+1. If target is a git repo with uncommitted changes -> **refuse** to run `migrate` (scan is always allowed) unless `--allow-dirty`.
+2. Migration edits happen on a **new branch** `evergreen/<vendor>-<version>` created from current HEAD (suffix `-2`, `-3`... if taken).
+3. If target is NOT a git repo -> `migrate` requires `--no-git` acknowledgment; edits in place, report only.
 4. Evergreen NEVER: force-pushes, deletes branches, amends existing commits, touches hooks, or merges.
 
 ### FR-02.3 Scope limits
@@ -72,7 +72,7 @@ A changefeed is a JSON document describing one versioned set of breaking changes
 
 ---
 
-## FR-03 — Impact Scanner
+## FR-03 -- Impact Scanner
 
 ### FR-03.1 Deterministic pass
 - For each change rule: enumerate files matching `detect.filePatterns` (minus excludes), apply each regex per line.
@@ -83,16 +83,16 @@ A changefeed is a JSON document describing one versioned set of breaking changes
 - Batch findings (grouped by file, with ±10 lines context) to a cheap model (**Claude Haiku 5.5**) returning per-finding: `verdict: affected|not_affected|uncertain` + one-line reason.
 - Engine (v1.1): the triage call runs through the Claude Agent SDK (`query`, model `claude-haiku-5-5`, no tools, single turn) so it shares Claude Code subscription auth; a raw `@anthropic-ai/sdk` Messages path may be added when `ANTHROPIC_API_KEY` deployments matter (hosted workers).
 - `uncertain` is treated as `affected` (conservative).
-- Triage failures (API error) → fall back to treating all findings as affected; never silently drop findings.
+- Triage failures (API error) -> fall back to treating all findings as affected; never silently drop findings.
 
 ### FR-03.3 Scan report
-- Human output: table grouped by rule → file:line.
+- Human output: table grouped by rule -> file:line.
 - `--json`: machine-readable `ScanResult` (schema in SYSTEM_DESIGN §4) written to stdout or `--out <file>`.
 - Exit code: `0` findings or clean; `2` on scanner error.
 
 ---
 
-## FR-04 — Migration Agent (core)
+## FR-04 -- Migration Agent (core)
 
 ### FR-04.1 Engine
 - Default engine: **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`), driving a session whose working directory is the target repo.
@@ -103,15 +103,15 @@ A changefeed is a JSON document describing one versioned set of breaking changes
 The agent receives:
 1. The spec (vendor, version, deadline, docs URLs).
 2. The scoped rule list with `replace.guidance` + before/after examples.
-3. The scanner's findings (file:line per rule) — its authoritative work list.
+3. The scanner's findings (file:line per rule) -- its authoritative work list.
 4. The **minimal-diff contract** (FR-04.3).
 5. Required output: a change manifest (FR-04.4) written to a designated path.
 
 ### FR-04.3 Minimal-diff contract (prompt-enforced, review-verified)
-- Touch ONLY files in the findings list, plus a file that must change as a direct consequence (e.g., a type import) — each such extra file must be justified in the manifest.
+- Touch ONLY files in the findings list, plus a file that must change as a direct consequence (e.g., a type import) -- each such extra file must be justified in the manifest.
 - No reformatting, no renames, no refactors, no dependency changes unless a rule mandates a version floor.
 - Preserve existing code style per file.
-- If a finding cannot be migrated safely (dynamic dispatch, metaprogramming, ambiguous semantics) → leave code untouched, record `skipped` with reason in manifest.
+- If a finding cannot be migrated safely (dynamic dispatch, metaprogramming, ambiguous semantics) -> leave code untouched, record `skipped` with reason in manifest.
 - Preserve whitespace and operator spacing exactly outside the tokens the migration changes; an edit may not alter spacing it did not need to touch. *(added v1.1 after M1 demo produced a cosmetic `-Math.floor` spacing regression)*
 
 ### FR-04.4 Change manifest
@@ -133,15 +133,15 @@ Agent writes `.evergreen/manifest.json` in the repo:
   "notes": "anything the reviewer must know"
 }
 ```
-- Orchestrator validates the manifest (schema + every findings-file accounted for). Missing/invalid manifest → run marked `failed`, working tree restored (git) — never a silent partial success.
+- Orchestrator validates the manifest (schema + every findings-file accounted for). Missing/invalid manifest -> run marked `failed`, working tree restored (git) -- never a silent partial success.
 
 ### FR-04.5 Confidence gating
-- Per-file confidence < threshold (default **0.8**, `.evergreen.json: confidenceThreshold`) → orchestrator reverts that file (git checkout of the file on the migration branch) and downgrades it to `reported` in the report.
+- Per-file confidence < threshold (default **0.8**, `.evergreen.json: confidenceThreshold`) -> orchestrator reverts that file (git checkout of the file on the migration branch) and downgrades it to `reported` in the report.
 - Overall-run confidence = min of migrated files.
 
 ### FR-04.6 Verification hook (flag-gated: `--verify`)
 - If `.evergreen.json: verifyCommand` set, orchestrator runs it (shell, in repo root, after migration, on the branch).
-- Non-zero exit → recorded in manifest + report; branch still created (reviewer decides); confidence capped at 0.5.
+- Non-zero exit -> recorded in manifest + report; branch still created (reviewer decides); confidence capped at 0.5.
 
 ### FR-04.7 Failure modes
 | Failure | Behavior |
@@ -152,15 +152,15 @@ Agent writes `.evergreen/manifest.json` in the repo:
 
 ---
 
-## FR-05 — Delivery (branch / commit / PR)
+## FR-05 -- Delivery (branch / commit / PR)
 
 ### FR-05.1 Local delivery (MVP)
 - All agent edits land on branch `evergreen/<vendor>-<version>`.
-- One commit: `migrate(<vendor>): <version> — <n> files` with spec reference and manifest summary in body.
+- One commit: `migrate(<vendor>): <version> -- <n> files` with spec reference and manifest summary in body.
 - Original branch checked out again at the end; working tree clean.
 
 ### FR-05.2 Report file
-- `MIGRATION_REPORT.md` generated into `.evergreen/` (committed on the branch): spec summary, per-rule → per-file table, before/after snippets for up to 10 representative hunks, confidence, verification results, docs links, review checklist.
+- `MIGRATION_REPORT.md` generated into `.evergreen/` (committed on the branch): spec summary, per-rule -> per-file table, before/after snippets for up to 10 representative hunks, confidence, verification results, docs links, review checklist.
 
 ### FR-05.3 GitHub PR (P1)
 - Via GitHub App token or `gh` CLI when available: push branch, open PR with report as body, label `evergreen`.
@@ -168,14 +168,14 @@ Agent writes `.evergreen/manifest.json` in the repo:
 
 ---
 
-## FR-06 — Reporting
+## FR-06 -- Reporting
 - `evergreen report` re-renders the last manifest as human output.
 - `--json` everywhere for machine consumption.
 - Telemetry: NONE in MVP (no phoning home). P1 opt-in only.
 
 ---
 
-## FR-07 — CLI & Config
+## FR-07 -- CLI & Config
 
 ### FR-07.1 Commands
 ```
@@ -198,24 +198,24 @@ evergreen report  --repo <path> [--json]
 Precedence: CLI flag > repo config > defaults.
 
 ### FR-07.3 Environment
-- Engine auth: Claude Agent SDK resolves credentials per its standard chain (`ANTHROPIC_API_KEY` or Claude Code login). Missing credentials → clear error naming both options, exit 4.
+- Engine auth: Claude Agent SDK resolves credentials per its standard chain (`ANTHROPIC_API_KEY` or Claude Code login). Missing credentials -> clear error naming both options, exit 4.
 
 ---
 
-## FR-08 — GitHub App Integration (Release 0.3)
+## FR-08 -- GitHub App Integration (Release 0.3)
 
 ### FR-08.1 App identity & installation
 - Evergreen registers as a **GitHub App** with these permissions:
-  - **Contents: read** — clone/fetch repo files for scanning.
-  - **Checks: write** — post Check Run results with per-line annotations.
-  - **Pull requests: read** — receive PR events, read PR metadata.
-  - **Metadata: read** (default) — repo name, owner, default branch.
+  - **Contents: read** -- clone/fetch repo files for scanning.
+  - **Checks: write** -- post Check Run results with per-line annotations.
+  - **Pull requests: read** -- receive PR events, read PR metadata.
+  - **Metadata: read** (default) -- repo name, owner, default branch.
 - The app subscribes to webhook events: `push`, `pull_request` (opened, synchronize, reopened), `installation`.
 - Installation is per-repo or per-org (GitHub standard). No OAuth user flow in 0.3.
 
 ### FR-08.2 Webhook server
 - An HTTP server (Express) listens for GitHub webhooks on `POST /api/github/webhooks`.
-- **Signature verification**: every request verified against `WEBHOOK_SECRET` using `@octokit/webhooks`. Unverified → 401.
+- **Signature verification**: every request verified against `WEBHOOK_SECRET` using `@octokit/webhooks`. Unverified -> 401.
 - **Health check**: `GET /healthz` returns 200 + `{ status: "ok", specs: <count> }`.
 - Server responds 202 to the webhook immediately, processes asynchronously.
 
@@ -223,7 +223,7 @@ Precedence: CLI flag > repo config > defaults.
 - On a scan-triggering event, the server performs a **shallow clone** (`--depth 1`) of the target ref using an installation access token.
 - Clone destination: system temp directory, cleaned up after scan.
 - Clone uses HTTPS with token auth: `https://x-access-token:<token>@github.com/<owner>/<repo>.git`.
-- If clone fails (permissions, network) → log error, post a failed Check Run with a summary, do not retry.
+- If clone fails (permissions, network) -> log error, post a failed Check Run with a summary, do not retry.
 
 ### FR-08.4 Multi-spec scan
 - A **spec registry** loads all `*.json` files from the `specs/` directory at server startup.
@@ -232,12 +232,12 @@ Precedence: CLI flag > repo config > defaults.
 - The existing `scan()` function from `src/scanner/scan.ts` is reused unchanged.
 - Each spec that produces findings generates a separate Check Run.
 
-### FR-08.5 Alert delivery — Check Runs
+### FR-08.5 Alert delivery -- Check Runs
 - For each spec with findings, the server creates a **GitHub Check Run** on the target commit SHA:
   - **Name**: `Evergreen: <spec.title>`
   - **Status**: `completed`
   - **Conclusion**: `action_required` (findings found) or `success` (no findings)
-  - **Summary**: human-readable table: rule → file:line count, total affected files, migration available indicator.
+  - **Summary**: human-readable table: rule -> file:line count, total affected files, migration available indicator.
   - **Annotations** (up to 50 per Check Run, GitHub limit): one per finding, severity mapped to `warning` (breaking/deprecation) or `notice` (behavioral), message includes rule title + guidance snippet.
   - If >50 findings: first 50 as annotations, summary notes the overflow count.
 - When a `pull_request` event triggers the scan, the Check Run targets the PR's head SHA, so it appears in the PR's Checks tab.
@@ -246,18 +246,18 @@ Precedence: CLI flag > repo config > defaults.
 
 ### FR-08.6 Configuration
 - Server configuration via environment variables:
-  - `GITHUB_APP_ID` (required) — the App's numeric ID.
-  - `GITHUB_PRIVATE_KEY` (required) — PEM-encoded private key (or path via `GITHUB_PRIVATE_KEY_PATH`).
-  - `GITHUB_WEBHOOK_SECRET` (required) — webhook HMAC secret.
-  - `PORT` (optional, default 3000) — HTTP listen port.
-  - `LOG_LEVEL` (optional, default `info`) — `debug | info | warn | error`.
+  - `GITHUB_APP_ID` (required) -- the App's numeric ID.
+  - `GITHUB_PRIVATE_KEY` (required) -- PEM-encoded private key (or path via `GITHUB_PRIVATE_KEY_PATH`).
+  - `GITHUB_WEBHOOK_SECRET` (required) -- webhook HMAC secret.
+  - `PORT` (optional, default 3000) -- HTTP listen port.
+  - `LOG_LEVEL` (optional, default `info`) -- `debug | info | warn | error`.
 - Per-repo `.evergreen.json` is respected for `ignore` globs if present in the cloned repo.
-- No spec-selection config per repo in 0.3 — all bundled specs are tried.
+- No spec-selection config per repo in 0.3 -- all bundled specs are tried.
 
 ### FR-08.7 App manifest (creation flow)
 - An `app-manifest.json` at project root enables one-click GitHub App creation via `https://github.com/settings/apps/new?manifest=<encoded>`.
 - Manifest declares the permissions, events, and webhook URL listed above.
-- Setup instructions in README cover: create app → download private key → set env vars → `evergreen serve`.
+- Setup instructions in README cover: create app -> download private key -> set env vars -> `evergreen serve`.
 
 ### FR-08.8 Failure modes
 | Failure | Behavior |
@@ -270,13 +270,13 @@ Precedence: CLI flag > repo config > defaults.
 
 ---
 
-## FR-09 — Multi-LLM Provider Support (Release 0.4)
+## FR-09 -- Multi-LLM Provider Support (Release 0.4)
 
 ### FR-09.1 Provider abstraction
 - The migration engine is decoupled from any single LLM vendor via a `LLMProvider` interface.
-- Each provider implements: `chat(messages, tools?, options?) → ChatResponse` with tool-call support.
-- A provider-agnostic **agent loop** drives the migration: send prompt → process tool calls → feed results back → repeat until the model emits a final text response with the manifest.
-- Tool surface remains Read/Edit/Write/Grep/Glob (FR-04.1) regardless of provider — tool implementations are shared.
+- Each provider implements: `chat(messages, tools?, options?) -> ChatResponse` with tool-call support.
+- A provider-agnostic **agent loop** drives the migration: send prompt -> process tool calls -> feed results back -> repeat until the model emits a final text response with the manifest.
+- Tool surface remains Read/Edit/Write/Grep/Glob (FR-04.1) regardless of provider -- tool implementations are shared.
 
 ### FR-09.2 Supported providers
 | Provider | SDK / Protocol | Key | Notes |
@@ -299,21 +299,21 @@ Precedence: CLI flag > repo config > defaults.
 
 ### FR-09.5 Constraints
 - All providers must support tool/function calling for migration. Providers without tool calling support are available for triage only.
-- The migration prompt is provider-agnostic — same system prompt and tool definitions regardless of backend.
+- The migration prompt is provider-agnostic -- same system prompt and tool definitions regardless of backend.
 - Token usage and cost tracking adapts per provider's pricing (configurable rates).
-- Source code sent to providers follows NFR-4 — user must be aware code is sent to the configured provider's API.
+- Source code sent to providers follows NFR-4 -- user must be aware code is sent to the configured provider's API.
 
 ---
 
-## FR-10 — Auto-PR on Webhook (Release 0.4)
+## FR-10 -- Auto-PR on Webhook (Release 0.4)
 
 ### FR-10.1 Migration trigger
 - When the webhook scanner (FR-08.4) finds breaking changes, the server can optionally trigger an automated migration and open a PR.
-- Gated by: `AUTO_MIGRATE=true` env var (default: false — scan-only mode is the safe default).
-- Only triggers on **push** to the default branch (not on PRs — PRs get scan-only Check Runs).
+- Gated by: `AUTO_MIGRATE=true` env var (default: false -- scan-only mode is the safe default).
+- Only triggers on **push** to the default branch (not on PRs -- PRs get scan-only Check Runs).
 
 ### FR-10.2 Hosted migration flow
-1. Scan detects findings → creates "in_progress" Check Run.
+1. Scan detects findings -> creates "in_progress" Check Run.
 2. Run the existing `migrate` orchestrator (FR-04) on the shallow-cloned repo with the configured provider.
 3. On success: push the `evergreen/*` branch, open a PR via GitHub API.
 4. Update Check Run to `completed` with conclusion `action_required` and a link to the PR.

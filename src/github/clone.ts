@@ -1,4 +1,4 @@
-// FR-08.3 — Shallow clone via installation token + cleanup
+// FR-08.3 - Shallow clone via installation token + cleanup
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,7 +26,7 @@ export async function shallowClone(
       maxBuffer: 10 * 1024 * 1024,
     });
   } catch (e: any) {
-    // ref might be a SHA not a branch — try fetch-based approach
+    // ref might be a SHA not a branch - try fetch-based approach
     await run("git", ["clone", "--depth", "1", url, dir], {
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,

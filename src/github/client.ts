@@ -1,4 +1,4 @@
-// FR-08.1/08.3 — GitHub App authentication + Octokit client factory
+// FR-08.1/08.3 - GitHub App authentication + Octokit client factory
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 

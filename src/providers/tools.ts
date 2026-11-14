@@ -1,7 +1,7 @@
-// FR-09.1 / FR-04.1 — Shared tool implementations for the provider-agnostic agent loop.
-// Tool surface: Read, Edit, Write, Grep, Glob — no Bash, no network.
+// FR-09.1 / FR-04.1 - Shared tool implementations for the provider-agnostic agent loop.
+// Tool surface: Read, Edit, Write, Grep, Glob - no Bash, no network.
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, dirname, relative } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fg from "fast-glob";
@@ -119,8 +119,14 @@ async function toolWrite(root: string, filePath: string, content: string): Promi
 }
 
 async function toolGrep(root: string, pattern: string, glob?: string): Promise<string> {
+  if (pattern.length > 500) throw new Error("Regex pattern too long (max 500 chars)");
   const files = await fg(glob ?? "**/*", { cwd: root, dot: false, ignore: ["**/node_modules/**", "**/.git/**"] });
-  const regex = new RegExp(pattern);
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch (e: any) {
+    throw new Error(`Invalid regex: ${e.message}`);
+  }
   const results: string[] = [];
   for (const f of files.slice(0, 500)) {
     try {
@@ -143,8 +149,11 @@ async function toolGlob(root: string, pattern: string): Promise<string> {
 }
 
 function assertInside(root: string, abs: string): void {
-  const rel = relative(root, abs);
-  if (rel.startsWith("..") || rel.startsWith("/") || rel.includes("..")) {
-    throw new Error(`Path escapes repo root: ${rel}`);
+  const normRoot = resolve(root);
+  const normAbs = resolve(abs);
+  const sep = normRoot.includes("\\") ? "\\" : "/";
+  const prefix = normRoot.endsWith(sep) ? normRoot : normRoot + sep;
+  if (normAbs !== normRoot && !normAbs.startsWith(prefix)) {
+    throw new Error(`Path escapes repo root: ${abs}`);
   }
 }

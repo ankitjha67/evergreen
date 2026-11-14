@@ -1,4 +1,4 @@
-// Tests for FR-08.5 — Webhook event log
+// Tests for FR-08.5 - Webhook event log
 import { describe, it, expect } from "vitest";
 import { EventLog, WebhookEvent } from "../src/server/event-log.js";
 

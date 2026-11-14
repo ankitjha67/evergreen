@@ -1,4 +1,4 @@
-// FR-09.2 — Anthropic Claude provider via Messages API
+// FR-09.2 - Anthropic Claude provider via Messages API
 import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
 
 export class AnthropicProvider implements LLMProvider {

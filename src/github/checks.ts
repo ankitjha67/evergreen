@@ -1,4 +1,4 @@
-// FR-08.5 — Check Run creation with annotations
+// FR-08.5 - Check Run creation with annotations
 import { Octokit } from "@octokit/rest";
 import { BreakingChangeSpec, Finding, ScanResult, specRef } from "../types.js";
 

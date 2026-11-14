@@ -1,4 +1,4 @@
-// FR-02 — git safety protocol (integration on temp repos)
+// FR-02 - git safety protocol (integration on temp repos)
 import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -52,7 +52,7 @@ describe("FR-02 git safety", () => {
     await writeFile(join(repo, "src", "b.js"), "const b = 3;\n"); // modified (first status line!)
     await writeFile(join(repo, "created.js"), "new\n"); // untracked
     const changed = await g.changedFiles(repo);
-    expect(changed.sort()).toEqual(["created.js", "src/b.js"]); // regression: trim bug mangled "src/" → "rc/"
+    expect(changed.sort()).toEqual(["created.js", "src/b.js"]); // regression: trim bug mangled "src/" -> "rc/"
   });
 
   it("restoreFiles: reverts tracked edits and removes untracked files", async () => {

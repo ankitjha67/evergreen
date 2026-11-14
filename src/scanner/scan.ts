@@ -1,4 +1,4 @@
-// FR-03.1 — Impact Scanner: deterministic pattern pass (FSD.md FR-03.1, SYSTEM_DESIGN.md §7)
+// FR-03.1 - Impact Scanner: deterministic pattern pass (FSD.md FR-03.1, SYSTEM_DESIGN.md §7)
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import fg from "fast-glob";
@@ -104,10 +104,10 @@ export function renderScanTable(result: ScanResult, spec: BreakingChangeSpec): s
     (byRule.get(f.ruleId) ?? byRule.set(f.ruleId, []).get(f.ruleId)!).push(f);
   }
   const lines: string[] = [];
-  lines.push(`Spec: ${result.specRef} — ${result.findings.length} finding(s) in ${new Set(result.findings.map((f) => f.file)).size} file(s), ${result.scannedFiles} files scanned (${result.durationMs}ms)\n`);
+  lines.push(`Spec: ${result.specRef} - ${result.findings.length} finding(s) in ${new Set(result.findings.map((f) => f.file)).size} file(s), ${result.scannedFiles} files scanned (${result.durationMs}ms)\n`);
   for (const [ruleId, fs] of byRule) {
     const rule = spec.changes.find((c) => c.id === ruleId);
-    lines.push(`■ ${ruleId} — ${rule?.title ?? ""} [${rule?.severity}]`);
+    lines.push(`■ ${ruleId} - ${rule?.title ?? ""} [${rule?.severity}]`);
     for (const f of fs) lines.push(`    ${f.file}:${f.line}:${f.column}  ${f.lineText}`);
     lines.push("");
   }

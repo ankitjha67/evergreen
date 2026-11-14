@@ -1,4 +1,4 @@
-// FR-09.2 — Google Gemini provider via @google/generative-ai SDK
+// FR-09.2 - Google Gemini provider via @google/generative-ai SDK
 import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
 
 export class GeminiProvider implements LLMProvider {

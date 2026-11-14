@@ -1,4 +1,4 @@
-// FR-08.6 — Admin dashboard HTML renderer
+// FR-08.6 - Admin dashboard HTML renderer
 import type { WebhookEvent } from "./event-log.js";
 
 interface DashboardData {
@@ -22,7 +22,7 @@ function formatUptime(seconds: number): string {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 export function renderDashboard(data: DashboardData): string {
@@ -33,7 +33,7 @@ export function renderDashboard(data: DashboardData): string {
       <td>${esc(s.ref)}</td>
       <td>${esc(s.vendor)}</td>
       <td>${esc(s.api)} ${esc(s.version)}</td>
-      <td>${s.languages.join(", ")}</td>
+      <td>${s.languages.map(esc).join(", ")}</td>
       <td>${s.rules}</td>
     </tr>`).join("");
 

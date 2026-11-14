@@ -1,4 +1,4 @@
-// FR-03.1 — deterministic scanner
+// FR-03.1 - deterministic scanner
 import { describe, it, expect, beforeAll } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,7 +19,7 @@ const spec: BreakingChangeSpec = {
       severity: "breaking",
       title: "oldApi removed",
       description: "d",
-      // two patterns that both hit the same line — dedupe must collapse them
+      // two patterns that both hit the same line - dedupe must collapse them
       detect: { patterns: ["oldApi\\(", "client\\.oldApi"], filePatterns: ["**/*.js"] },
       replace: { guidance: "use newApi" },
     },

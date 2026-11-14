@@ -1,10 +1,10 @@
-// FR-08.2 — Server integration tests (health check, webhook signature)
+// FR-08.2 - Server integration tests (health check, webhook signature)
 import { describe, it, expect } from "vitest";
 import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
 import { createServer, ServerConfig } from "../src/server/app.js";
 
-// Minimal test private key (RSA 2048, NOT real — for test signature only)
+// Minimal test private key (RSA 2048, NOT real - for test signature only)
 const TEST_PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGcY5unA67hqxnfZoGMWF9Kq
 T1bbMbVtmkZNAQJ8MRDNKGY2MXKKJN7fMtNIM/KtNVHv5JKJnHAI2Y+lPMksOiz

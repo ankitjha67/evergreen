@@ -1,4 +1,4 @@
-// FR-08.5 — Check Run annotation mapping tests
+// FR-08.5 - Check Run annotation mapping tests
 import { describe, it, expect } from "vitest";
 import { BreakingChangeSpec, Finding, ScanResult } from "../src/types.js";
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FR-07 — CLI shell. The ONLY file that reads argv (ARCHITECTURE.md §5).
+// FR-07 - CLI shell. The ONLY file that reads argv (ARCHITECTURE.md S5).
 import { Command } from "commander";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -83,8 +83,8 @@ program
   });
 
 function printTriage(t: any): void {
-  console.log(`\nTriage (claude-haiku-5-5)${t.degraded ? ` — DEGRADED: ${t.degraded}` : ""}`);
-  for (const v of t.verdicts) console.log(`  ${String(v.verdict).padEnd(13)} ${v.file}:${v.line} [${v.ruleId}] — ${v.reason}`);
+  console.log(`\nTriage (claude-haiku-5-5)${t.degraded ? ` - DEGRADED: ${t.degraded}` : ""}`);
+  for (const v of t.verdicts) console.log(`  ${String(v.verdict).padEnd(13)} ${v.file}:${v.line} [${v.ruleId}] - ${v.reason}`);
   if (t.usage) console.log(`  triage cost: $${t.usage.costUSD}`);
 }
 
@@ -103,12 +103,12 @@ function summarize(outcome: any): void {
   if (outcome.branch) console.log(`Branch:  ${outcome.branch}`);
   if (outcome.manifest) {
     for (const f of outcome.manifest.files) {
-      console.log(`  ${f.status.padEnd(9)} ${f.path}  (confidence ${f.confidence.toFixed(2)}) — ${f.summary}`);
+      console.log(`  ${f.status.padEnd(9)} ${f.path}  (confidence ${f.confidence.toFixed(2)}) - ${f.summary}`);
     }
   }
   for (const g of outcome.gated) console.log(`  gated     ${g.path} (confidence ${g.confidence.toFixed(2)} < threshold, reverted)`);
   for (const v of outcome.violations) console.log(`  violation ${v}`);
-  if (outcome.verify) console.log(`Verify: ${outcome.verify.command} → exit ${outcome.verify.exitCode}`);
+  if (outcome.verify) console.log(`Verify: ${outcome.verify.command} -> exit ${outcome.verify.exitCode}`);
   if (outcome.usage)
     console.log(
       `Cost: $${outcome.usage.costUSD} (in ${outcome.usage.inputTokens.toLocaleString()} / cache-read ${outcome.usage.cacheReadTokens.toLocaleString()} / cache-write ${outcome.usage.cacheCreationTokens.toLocaleString()} / out ${outcome.usage.outputTokens.toLocaleString()})`,
@@ -171,9 +171,9 @@ program
       console.error(`.evergreen.yaml already exists at ${configPath}`);
       process.exitCode = 1;
       return;
-    } catch { /* file doesn't exist — proceed */ }
+    } catch { /* file doesn't exist - proceed */ }
 
-    const template = `# Evergreen configuration — controls how migrations run in this repo.
+    const template = `# Evergreen configuration - controls how migrations run in this repo.
 # See: https://github.com/ankitjha67/evergreen
 
 # LLM provider for migrations (default: anthropic)
@@ -182,10 +182,10 @@ program
 # Model override (default: provider's default model)
 # model: claude-opus-5-5
 
-# Confidence threshold — files below this score are reverted (0..1)
+# Confidence threshold - files below this score are reverted (0..1)
 threshold: 0.7
 
-# Verify command — runs after migration to check nothing broke
+# Verify command - runs after migration to check nothing broke
 # verify: npm test
 
 # Auto-triage findings with Haiku before migrating
@@ -200,7 +200,7 @@ triage: true
     console.log(`Created .evergreen.yaml at ${configPath}`);
   });
 
-// evergreen diff — preview what migration would change, without running the agent
+// evergreen diff - preview what migration would change, without running the agent
 common(program.command("diff").description("Preview which files and rules a migration would touch (scan + rule detail, no agent run)"))
   .option("--triage", "triage findings first", false)
   .action(async (o) => {
@@ -250,7 +250,7 @@ common(program.command("diff").description("Preview which files and rules a migr
               console.log(`      - ${rule.replace.before}`);
               console.log(`      + ${rule.replace.after}`);
             } else if (rule?.replace.guidance) {
-              console.log(`      → ${rule.replace.guidance.slice(0, 100)}`);
+              console.log(`      -> ${rule.replace.guidance.slice(0, 100)}`);
             }
           }
           console.log();
@@ -262,7 +262,7 @@ common(program.command("diff").description("Preview which files and rules a migr
     }
   });
 
-// evergreen fetch-spec — download a changefeed spec from a URL
+// evergreen fetch-spec - download a changefeed spec from a URL
 program
   .command("fetch-spec")
   .description("Download a changefeed spec from a URL and save to specs/")
@@ -342,7 +342,7 @@ program
     console.log();
   });
 
-// evergreen specs — list all bundled changefeed specs
+// evergreen specs - list all bundled changefeed specs
 program
   .command("specs")
   .description("List all bundled changefeed specs")
@@ -380,7 +380,7 @@ program
     }
   });
 
-// evergreen scan-all — scan a repo against all matching specs
+// evergreen scan-all - scan a repo against all matching specs
 program
   .command("scan-all")
   .description("Scan a repo against all bundled specs matching its language")
@@ -447,7 +447,7 @@ program
             for (const f of r.result.findings) {
               byRule.set(f.ruleId, (byRule.get(f.ruleId) ?? 0) + 1);
             }
-            console.log(`  ${r.ref} — ${r.result.findings.length} finding(s) in ${r.result.scannedFiles} files (${r.result.durationMs}ms)`);
+            console.log(`  ${r.ref} - ${r.result.findings.length} finding(s) in ${r.result.scannedFiles} files (${r.result.durationMs}ms)`);
             for (const [rule, count] of byRule) {
               console.log(`    ${rule}: ${count} match${count > 1 ? "es" : ""}`);
             }

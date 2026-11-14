@@ -1,4 +1,4 @@
-// Tests for Python language support — Stripe Python SDK spec + fixture scanning
+// Tests for Python language support - Stripe Python SDK spec + fixture scanning
 import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
 import { loadSpec, validateSpec } from "../src/changefeed/loader.js";

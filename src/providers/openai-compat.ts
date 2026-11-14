@@ -1,4 +1,4 @@
-// FR-09.2 — OpenAI-compatible provider: covers Ollama, NVIDIA NIM, Groq, Together AI,
+// FR-09.2 - OpenAI-compatible provider: covers Ollama, NVIDIA NIM, Groq, Together AI,
 // Fireworks AI, DeepSeek, LM Studio, vLLM, Anyscale, Perplexity, Mistral, Azure OpenAI, etc.
 import { OpenAIProvider } from "./openai.js";
 import { ProviderConfig } from "./types.js";
@@ -19,7 +19,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "llama3.3:70b",
     envKeys: { baseUrl: "OLLAMA_BASE_URL" },
     defaultBaseUrl: "http://localhost:11434/v1",
-    description: "Local models via Ollama — no API key, runs on your machine",
+    description: "Local models via Ollama - no API key, runs on your machine",
     local: true,
   },
   lmstudio: {
@@ -48,7 +48,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "meta/llama-3.3-70b-instruct",
     envKeys: { apiKey: "NVIDIA_API_KEY", baseUrl: "NVIDIA_BASE_URL" },
     defaultBaseUrl: "https://integrate.api.nvidia.com/v1",
-    description: "NVIDIA NIM — enterprise-grade inference for open models",
+    description: "NVIDIA NIM - enterprise-grade inference for open models",
     local: false,
   },
   groq: {
@@ -57,7 +57,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "llama-3.3-70b-versatile",
     envKeys: { apiKey: "GROQ_API_KEY" },
     defaultBaseUrl: "https://api.groq.com/openai/v1",
-    description: "Groq — ultra-fast LPU inference",
+    description: "Groq - ultra-fast LPU inference",
     local: false,
   },
   together: {
@@ -66,7 +66,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
     envKeys: { apiKey: "TOGETHER_API_KEY" },
     defaultBaseUrl: "https://api.together.xyz/v1",
-    description: "Together AI — open model inference and fine-tuning",
+    description: "Together AI - open model inference and fine-tuning",
     local: false,
   },
   fireworks: {
@@ -75,7 +75,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct",
     envKeys: { apiKey: "FIREWORKS_API_KEY" },
     defaultBaseUrl: "https://api.fireworks.ai/inference/v1",
-    description: "Fireworks AI — fast generative AI inference",
+    description: "Fireworks AI - fast generative AI inference",
     local: false,
   },
   deepseek: {
@@ -84,7 +84,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "deepseek-chat",
     envKeys: { apiKey: "DEEPSEEK_API_KEY" },
     defaultBaseUrl: "https://api.deepseek.com/v1",
-    description: "DeepSeek — high-quality reasoning models",
+    description: "DeepSeek - high-quality reasoning models",
     local: false,
   },
   mistral: {
@@ -93,7 +93,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "mistral-large-latest",
     envKeys: { apiKey: "MISTRAL_API_KEY" },
     defaultBaseUrl: "https://api.mistral.ai/v1",
-    description: "Mistral AI — European frontier AI lab",
+    description: "Mistral AI - European frontier AI lab",
     local: false,
   },
   perplexity: {
@@ -102,7 +102,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "llama-3.1-sonar-large-128k-online",
     envKeys: { apiKey: "PERPLEXITY_API_KEY" },
     defaultBaseUrl: "https://api.perplexity.ai",
-    description: "Perplexity — search-augmented AI models",
+    description: "Perplexity - search-augmented AI models",
     local: false,
   },
   anyscale: {
@@ -111,7 +111,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct",
     envKeys: { apiKey: "ANYSCALE_API_KEY" },
     defaultBaseUrl: "https://api.endpoints.anyscale.com/v1",
-    description: "Anyscale Endpoints — scalable model serving",
+    description: "Anyscale Endpoints - scalable model serving",
     local: false,
   },
   "azure-openai": {
@@ -120,7 +120,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "gpt-4o",
     envKeys: { apiKey: "AZURE_OPENAI_API_KEY", baseUrl: "AZURE_OPENAI_ENDPOINT" },
     defaultBaseUrl: "",
-    description: "Azure OpenAI Service — enterprise deployment of OpenAI models",
+    description: "Azure OpenAI Service - enterprise deployment of OpenAI models",
     local: false,
   },
   openrouter: {
@@ -129,7 +129,7 @@ export const OPENAI_COMPAT_PRESETS = {
     defaultModel: "anthropic/claude-opus-5-5",
     envKeys: { apiKey: "OPENROUTER_API_KEY" },
     defaultBaseUrl: "https://openrouter.ai/api/v1",
-    description: "OpenRouter — unified API for 200+ models",
+    description: "OpenRouter - unified API for 200+ models",
     local: false,
   },
 } as const;

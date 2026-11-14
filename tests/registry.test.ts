@@ -1,4 +1,4 @@
-// FR-08.4 — Spec registry tests
+// FR-08.4 - Spec registry tests
 import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
 import { SpecRegistry } from "../src/registry/specs.js";

@@ -1,4 +1,4 @@
-// FR-04.1 — Migration agent: Claude Agent SDK session, cwd-jailed, no bash/network
+// FR-04.1 - Migration agent: Claude Agent SDK session, cwd-jailed, no bash/network
 // (FSD.md FR-04, SYSTEM_DESIGN.md §6.1)
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -79,7 +79,7 @@ export async function runMigrationAgent(
   return { manifest, manifestProblems: problems, usage, finalText };
 }
 
-/** FR-09 — Run migration via the provider-agnostic agent loop (non-Anthropic providers). */
+/** FR-09 - Run migration via the provider-agnostic agent loop (non-Anthropic providers). */
 export async function runProviderMigration(
   repo: string,
   prompt: string,
@@ -96,7 +96,7 @@ export async function runProviderMigration(
   return { manifest, manifestProblems: problems, usage, finalText };
 }
 
-// FR-04.4 — manifest validation: missing/invalid manifest => failed run
+// FR-04.4 - manifest validation: missing/invalid manifest => failed run
 async function readManifest(repo: string): Promise<{ manifest?: ChangeManifest; problems: string[] }> {
   const problems: string[] = [];
   let raw: string;

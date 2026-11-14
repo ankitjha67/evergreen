@@ -1,4 +1,4 @@
-// FR-01 — Changefeed loader: parse + validate BreakingChangeSpec (FSD.md FR-01.1/01.2)
+// FR-01 - Changefeed loader: parse + validate BreakingChangeSpec (FSD.md FR-01.1/01.2)
 import { readFile } from "node:fs/promises";
 import { BreakingChangeSpec, SpecValidationError } from "../types.js";
 

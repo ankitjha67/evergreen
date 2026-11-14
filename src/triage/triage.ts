@@ -1,4 +1,4 @@
-// FR-03.2 — Triage pass: Claude Haiku 5.5 discards false positives before migration.
+// FR-03.2 - Triage pass: Claude Haiku 5.5 discards false positives before migration.
 // Conservative by contract: uncertain => affected; any failure => all findings treated affected.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -99,7 +99,7 @@ ${candidates.join("\n\n")}
 
 Reply with ONLY a JSON array, one entry per candidate, in order:
 [{"i": 0, "verdict": "affected" | "not_affected" | "uncertain", "reason": "<one short sentence>"}, ...]
-When in doubt, use "uncertain" — never "not_affected" unless you are sure.`;
+When in doubt, use "uncertain" - never "not_affected" unless you are sure.`;
 }
 
 export function parseVerdicts(text: string, expected: number): { verdict: Verdict; reason: string }[] | null {

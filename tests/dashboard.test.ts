@@ -1,4 +1,4 @@
-// Tests for FR-08.6 — Admin dashboard + specs API
+// Tests for FR-08.6 - Admin dashboard + specs API
 import { describe, it, expect } from "vitest";
 import { renderDashboard } from "../src/server/dashboard.js";
 import { createServer, ServerConfig } from "../src/server/app.js";

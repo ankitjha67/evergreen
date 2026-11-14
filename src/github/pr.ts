@@ -1,4 +1,4 @@
-// FR-10.3 — Auto-PR creation: push evergreen/* branch + open PR with evidence report
+// FR-10.3 - Auto-PR creation: push evergreen/* branch + open PR with evidence report
 import { Octokit } from "@octokit/rest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -31,7 +31,7 @@ export async function createMigrationPR(
   const commitMsg = [
     `fix: migrate ${spec.api} to ${spec.version}`,
     "",
-    `Auto-migration by Evergreen — ${spec.title}`,
+    `Auto-migration by Evergreen - ${spec.title}`,
     `Spec: ${specRef(spec)}`,
     `Findings: ${scan.findings.length} location(s) across ${new Set(scan.findings.map((f) => f.file)).size} file(s)`,
     `Files migrated: ${manifest.files.filter((f) => f.status === "migrated").length}`,

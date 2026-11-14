@@ -1,4 +1,4 @@
-// FR-09.1 — Provider-agnostic agentic migration loop.
+// FR-09.1 - Provider-agnostic agentic migration loop.
 // Sends the migration prompt, processes tool calls iteratively, returns the final text + usage.
 import { LLMProvider, ChatMessage, ToolResult, ChatOptions } from "./types.js";
 import { MIGRATION_TOOLS, executeTool } from "./tools.js";

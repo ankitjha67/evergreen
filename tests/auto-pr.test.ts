@@ -1,4 +1,4 @@
-// Tests for FR-10 — Auto-PR creation (unit tests, no actual GitHub calls)
+// Tests for FR-10 - Auto-PR creation (unit tests, no actual GitHub calls)
 import { describe, it, expect } from "vitest";
 import { BreakingChangeSpec, Finding, ScanResult, ChangeManifest, specRef } from "../src/types.js";
 
@@ -13,7 +13,7 @@ const mockSpec: BreakingChangeSpec = {
     {
       id: "STRIPE-001",
       severity: "breaking",
-      title: "charges.create → paymentIntents.create",
+      title: "charges.create -> paymentIntents.create",
       description: "The Charges API is removed. Use PaymentIntents.",
       detect: { patterns: ["charges\\.create"], filePatterns: ["**/*.ts", "**/*.js"] },
       replace: { guidance: "Replace charges.create with paymentIntents.create" },

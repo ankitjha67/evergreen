@@ -1,4 +1,4 @@
-// Tests for FR-09 — Multi-LLM provider abstraction
+// Tests for FR-09 - Multi-LLM provider abstraction
 import { describe, it, expect } from "vitest";
 import { MIGRATION_TOOLS, executeTool } from "../src/providers/tools.js";
 import { PROVIDER_PRICING } from "../src/providers/types.js";
@@ -25,7 +25,7 @@ describe("MIGRATION_TOOLS", () => {
   });
 });
 
-describe("executeTool — path traversal", () => {
+describe("executeTool - path traversal", () => {
   it("rejects paths that escape repo root", async () => {
     const result = await executeTool(
       { id: "1", name: "Read", arguments: { path: "../../etc/passwd" } },
