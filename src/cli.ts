@@ -14,13 +14,14 @@ const common = (cmd: Command) =>
   cmd
     .requiredOption("--spec <file>", "changefeed spec (BreakingChangeSpec JSON)")
     .option("--repo <path>", "target repository", process.cwd())
+    .option("--scope <paths>", "monorepo scope: comma-separated workspace paths (e.g. packages/api,packages/web)")
     .option("--json", "machine-readable output", false);
 
 common(program.command("scan").description("Find code affected by a breaking-change spec (read-only)"))
   .option("--triage", "run Haiku triage on findings (FR-03.2)", false)
   .action(async (o) => {
     try {
-      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: o.triage, json: o.json });
+      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: o.triage, json: o.json, scope: o.scope ? o.scope.split(",").map((s: string) => s.trim()) : undefined });
       if (o.json) {
         console.log(JSON.stringify({ scan: outcome.scan, triage: outcome.triage }, null, 2));
       } else {
@@ -62,6 +63,7 @@ common(program.command("migrate").description("Scan, then run the migration agen
         maxInputTokens: o.maxInputTokens,
         maxOutputTokens: o.maxOutputTokens,
         fallbackProviders: o.fallback ? o.fallback.split(",").map((s: string) => s.trim()) : undefined,
+        scope: o.scope ? o.scope.split(",").map((s: string) => s.trim()) : undefined,
       });
       if (o.json) {
         console.log(JSON.stringify(outcome, null, 2));
@@ -220,7 +222,7 @@ common(program.command("diff").description("Preview which files and rules a migr
   .option("--triage", "triage findings first", false)
   .action(async (o) => {
     try {
-      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: o.triage, json: false });
+      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: o.triage, json: false, scope: o.scope ? o.scope.split(",").map((s: string) => s.trim()) : undefined });
       const findings = outcome.triage
         ? outcome.triage.verdicts.filter((v: any) => v.verdict !== "not_affected")
         : outcome.scan.findings;
@@ -438,6 +440,7 @@ program
   .option("--repo <path>", "target repository", process.cwd())
   .option("--specs-dir <path>", "directory containing specs", "specs")
   .option("--lang <language>", "filter specs by language (auto-detect if omitted)")
+  .option("--scope <paths>", "monorepo scope: comma-separated workspace paths")
   .option("--json", "machine-readable output", false)
   .action(async (o) => {
     try {
@@ -451,6 +454,7 @@ program
 
       const repo = resolve(o.repo);
       const cfg = await loadRepoConfig(repo);
+      if (o.scope) cfg.scope = o.scope.split(",").map((s: string) => s.trim());
 
       // Auto-detect language from repo if not specified
       let specs = registry.allSpecs();
@@ -579,6 +583,103 @@ program
     console.log(`To configure fallback: MIGRATION_FALLBACK_PROVIDERS=openai,gemini or use .evergreen.yaml\n`);
   });
 
+// evergreen openapi-diff - generate changefeed spec from OpenAPI schema diff
+program
+  .command("openapi-diff")
+  .description("Generate a changefeed spec from two OpenAPI schemas (before & after)")
+  .argument("<before>", "path to the old OpenAPI schema JSON/YAML")
+  .argument("<after>", "path to the new OpenAPI schema JSON/YAML")
+  .requiredOption("--vendor <slug>", "vendor slug (e.g. stripe)")
+  .requiredOption("--api <name>", "API name (e.g. stripe-node)")
+  .requiredOption("--version <ver>", "version string (e.g. 2025-03-31)")
+  .option("--lang <languages>", "comma-separated languages", "javascript,typescript")
+  .option("--out <file>", "output file path")
+  .option("--json", "output to stdout as JSON", false)
+  .action(async (beforePath: string, afterPath: string, o: any) => {
+    try {
+      const { generateSpecFromDiff } = await import("./changefeed/openapi-diff.js");
+      const { writeFile } = await import("node:fs/promises");
+
+      const beforeRaw = await readFile(resolve(beforePath), "utf8");
+      const afterRaw = await readFile(resolve(afterPath), "utf8");
+      const before = JSON.parse(beforeRaw);
+      const after = JSON.parse(afterRaw);
+
+      const spec = generateSpecFromDiff(before, after, {
+        vendor: o.vendor,
+        api: o.api,
+        version: o.version,
+        languages: o.lang.split(",").map((s: string) => s.trim()),
+      });
+
+      if (o.json || !o.out) {
+        console.log(JSON.stringify(spec, null, 2));
+      }
+      if (o.out) {
+        await writeFile(resolve(o.out), JSON.stringify(spec, null, 2), "utf8");
+        console.log(`\nSpec written to ${resolve(o.out)} (${spec.changes.length} rules)`);
+      }
+    } catch (e: any) {
+      console.error(`OpenAPI diff failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen verify-specs - verify spec integrity checksums
+program
+  .command("verify-specs")
+  .description("Verify integrity of bundled specs via SHA-256 checksums")
+  .option("--specs-dir <path>", "directory containing specs", "specs")
+  .option("--generate", "generate checksum manifest instead of verifying", false)
+  .option("--json", "machine-readable output", false)
+  .action(async (o) => {
+    try {
+      const { verifySpecs, generateChecksumManifest, saveChecksumManifest } = await import("./changefeed/integrity.js");
+      const { readdirSync } = await import("node:fs");
+      const dir = resolve(o.specsDir);
+      const specFiles = readdirSync(dir).filter((f: string) => f.endsWith(".json") && f !== "checksums.json");
+
+      if (o.generate) {
+        const manifest = await generateChecksumManifest(dir, specFiles);
+        const saved = await saveChecksumManifest(dir, manifest);
+        console.log(`Generated checksum manifest: ${saved} (${manifest.checksums.length} specs)`);
+        return;
+      }
+
+      const results = await verifySpecs(dir, specFiles);
+
+      if (o.json) {
+        console.log(JSON.stringify(results, null, 2));
+        return;
+      }
+
+      const ok = results.filter((r) => r.status === "ok");
+      const mismatches = results.filter((r) => r.status === "mismatch");
+      const newSpecs = results.filter((r) => r.status === "new");
+      const missing = results.filter((r) => r.status === "missing");
+
+      console.log(`\nSpec Integrity Verification (${results.length} files)`);
+      console.log("─".repeat(50));
+      for (const r of results) {
+        const icon = r.status === "ok" ? "✓" : r.status === "new" ? "?" : "✗";
+        console.log(`  ${icon} ${r.file}: ${r.status}`);
+        if (r.status === "mismatch") {
+          console.log(`    expected: ${r.expected}`);
+          console.log(`    actual:   ${r.actual}`);
+        }
+      }
+      console.log(`\n  ${ok.length} ok, ${newSpecs.length} new, ${mismatches.length} mismatch, ${missing.length} missing\n`);
+
+      if (mismatches.length > 0) {
+        console.log("  Run `evergreen verify-specs --generate` to update the manifest.");
+        process.exitCode = 1;
+      }
+    } catch (e: any) {
+      console.error(`Verify failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
 // evergreen estimate - estimate migration cost before running the agent
 common(program.command("estimate").description("Estimate LLM cost for migrating a repo against a spec (no agent run)"))
   .option("--model <id>", "model to estimate for", "claude-opus-5-5")
@@ -589,7 +690,7 @@ common(program.command("estimate").description("Estimate LLM cost for migrating 
       const { estimateMigrationCost } = await import("./estimate.js");
       const { specRef } = await import("./types.js");
 
-      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: false, json: false });
+      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: false, json: false, scope: o.scope ? o.scope.split(",").map((s: string) => s.trim()) : undefined });
       const findings = outcome.scan.findings;
 
       if (findings.length === 0) {

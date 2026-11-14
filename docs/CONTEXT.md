@@ -20,7 +20,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change -> update FSD first. Structural change -> ARCHITECTURE/SYSTEM_DESIGN first. New decision -> log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning -- 164 tests
+**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning + OpenAPI diff + spec integrity + monorepo scoping -- 183 tests
 **Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests. **Ruby/Go support + spec registry (2026-11-14)**: 5 bundled specs across 4 languages, spec registry index fetch, 143 tests.
 
 | Workstream | State |
@@ -58,6 +58,9 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Vendor campaign analytics (FR-06.2) | ✅ `buildCampaignStats()` in `src/server/campaigns.ts`, `GET /api/campaigns` endpoint with `?vendor=` filter |
 | Cost estimation (FR-06) | ✅ `estimateMigrationCost()` in `src/estimate.ts`, `evergreen estimate` CLI command |
 | Batch repo scanning (FR-06) | ✅ `batchScan()` in `src/batch.ts`, `evergreen batch-scan` CLI with manifest files, concurrency control |
+| OpenAPI diff spec generator (FR-01.3) | ✅ `generateSpecFromDiff()` in `src/changefeed/openapi-diff.ts`, `evergreen openapi-diff` CLI command |
+| Spec integrity verification | ✅ SHA-256 checksums in `src/changefeed/integrity.ts`, `evergreen verify-specs` CLI with `--generate` |
+| Monorepo path scoping | ✅ `--scope` flag on scan/migrate/scan-all/diff/estimate commands, `scope` in RepoConfig |
 | `evergreen validate` CLI | ✅ Validates changefeed spec JSON, shows structured info, `--json` flag |
 | `.evergreen.yaml` config | ✅ YAML config fallback (key-value, comments, list items), `evergreen init` command |
 | specRef collision fix | ✅ `specRef` now `vendor@api@version` -- multi-language specs no longer collide in registry |
@@ -93,13 +96,21 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional -- D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-14 -- Session 14 (OpenAPI diff, spec integrity, monorepo scoping)
+- **OpenAPI diff spec generator** (`src/changefeed/openapi-diff.ts`): `diffOpenAPISchemas()` compares two OpenAPI schemas and detects: removed paths/methods/params/responses/schemas/fields/enum values, newly required params, deprecated endpoints. `generateSpecFromDiff()` converts diffs into a valid `BreakingChangeSpec`. `evergreen openapi-diff` CLI command with `--vendor`, `--api`, `--version`, `--lang`, `--out` options. Implements FR-01.3 P1 (auto-spec from OpenAPI diff).
+- **Spec integrity verification** (`src/changefeed/integrity.ts`): SHA-256 checksums for spec files. `generateChecksumManifest()` creates `checksums.json`, `verifySpecs()` checks current files against manifest (ok/mismatch/new/missing). `evergreen verify-specs` CLI with `--generate` to create manifest and default verify mode.
+- **Monorepo path scoping**: `--scope <paths>` flag added to scan, migrate, scan-all, diff, estimate commands. Scope prefixes all glob patterns to restrict scanning to specific workspace paths (e.g. `--scope packages/api,packages/web`). Also configurable via `scope` field in `.evergreen.json`/`.evergreen.yaml` and `RepoConfig`.
+- **Tests**: 183 passing across 29 suites (19 new: openapi-diff 10, integrity 4, scope 2, plus 3 from campaigns/estimate/batch improvements).
+- **CLI**: 18 commands total (added `openapi-diff`, `verify-specs`, plus `--scope` on 5 commands).
+- Next: vendor portal, marketplace listing, deploy to Railway/Render.
+
 ### 2026-11-14 -- Session 13 (Vendor campaigns, cost estimation, batch scanning)
 - **Vendor campaign analytics** (`src/server/campaigns.ts`): `buildCampaignStats()` aggregates `UsageRecord[]` into per-specRef campaign views with repos scanned/affected, findings, PRs created, cost, token totals, and first/last seen timestamps. `GET /api/campaigns` endpoint with optional `?vendor=` filter.
 - **Migration cost estimation** (`src/estimate.ts`): `estimateMigrationCost()` reads affected files, estimates input/output tokens based on file sizes and findings count, looks up model pricing from `PROVIDER_PRICING`, and returns a `CostEstimate` with confidence level (high/medium/low). `evergreen estimate` CLI command with `--model` and `--provider` options.
 - **Batch repo scanning** (`src/batch.ts`): `loadManifest()` parses JSON arrays, `{repos:[...]}` objects, or newline-separated text files. `batchScan()` runs concurrent scans (configurable concurrency up to 8) across multiple repos against all matching specs. `evergreen batch-scan` CLI with `--lang`, `--concurrency`, `--json` options.
 - **Tests**: 164 passing across 26 suites (21 new: campaigns 7, estimate 6, batch 7, scan-all unchanged).
 - **CLI**: 15 commands total (added `estimate`, `batch-scan`).
-- Next: vendor portal, marketplace listing, deploy to Railway/Render.
+- Next: OpenAPI diff spec generator, spec integrity, monorepo scoping.
 
 ### 2026-11-14 -- Session 12 (Ruby/Go language support, spec registry index)
 - **Stripe Ruby SDK changefeed spec** (`specs/stripe-ruby-2025-03-31-basil.json`): 3 rules covering `Stripe::Invoice.upcoming` -> `Stripe::Invoice.create_preview`, `current_period_start/end` -> `items.data[0]`, and `Stripe.api_key` -> `Stripe::StripeClient.new` pattern. Ruby-specific `filePatterns: ["**/*.rb"]`.

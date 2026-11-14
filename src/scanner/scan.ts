@@ -23,7 +23,12 @@ export async function scan(repo: string, spec: BreakingChangeSpec, cfg: RepoConf
 
   const ignore = [...DEFAULTS.excludes, ...(cfg.ignore ?? [])];
   const allPatterns = [...new Set(rules.flatMap((r) => r.filePatterns))];
-  const files = await fg(allPatterns, { cwd: repo, ignore, dot: false, onlyFiles: true });
+
+  // Monorepo scoping: if scope paths are set, prefix all patterns with each scope
+  const scopedPatterns = cfg.scope && cfg.scope.length > 0
+    ? cfg.scope.flatMap((s) => allPatterns.map((p) => `${s.replace(/\/$/, "")}/${p}`))
+    : allPatterns;
+  const files = await fg(scopedPatterns, { cwd: repo, ignore, dot: false, onlyFiles: true });
   files.sort();
 
   const findings: Finding[] = [];
@@ -33,7 +38,10 @@ export async function scan(repo: string, spec: BreakingChangeSpec, cfg: RepoConf
   // per-file rule applicability (a rule only scans files matching its own filePatterns)
   const ruleFileSets = new Map<string, Set<string>>();
   for (const r of rules) {
-    const matched = await fg(r.filePatterns, { cwd: repo, ignore, dot: false, onlyFiles: true });
+    const ruleScopedPatterns = cfg.scope && cfg.scope.length > 0
+      ? cfg.scope.flatMap((s) => r.filePatterns.map((p) => `${s.replace(/\/$/, "")}/${p}`))
+      : r.filePatterns;
+    const matched = await fg(ruleScopedPatterns, { cwd: repo, ignore, dot: false, onlyFiles: true });
     ruleFileSets.set(r.ruleId, new Set(matched));
   }
 

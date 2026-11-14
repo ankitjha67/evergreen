@@ -97,6 +97,7 @@ export interface RepoConfig {
   fallbackProviders?: string[];
   maxInputTokens?: number;
   maxOutputTokens?: number;
+  scope?: string[];
 }
 
 export interface MigrateOptions {
@@ -114,6 +115,7 @@ export interface MigrateOptions {
   maxInputTokens?: number;
   maxOutputTokens?: number;
   fallbackProviders?: string[];
+  scope?: string[];
 }
 
 export class SpecValidationError extends Error {

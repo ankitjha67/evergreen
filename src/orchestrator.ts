@@ -22,6 +22,7 @@ export async function scanOnly(opts: MigrateOptions): Promise<{ spec: BreakingCh
   const repo = resolve(opts.repo);
   const spec = await loadSpec(opts.specPath);
   const cfg = await loadRepoConfig(repo);
+  if (opts.scope) cfg.scope = opts.scope;
   const scanResult = await scan(repo, spec, cfg);
   const outcome: MigrationOutcome = {
     specRef: specRef(spec),
@@ -43,6 +44,7 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
   const repo = resolve(opts.repo);
   const spec = await loadSpec(opts.specPath);
   const cfg = await loadRepoConfig(repo);
+  if (opts.scope) cfg.scope = opts.scope;
   const threshold = opts.threshold ?? cfg.confidenceThreshold ?? DEFAULTS.confidenceThreshold;
   const model = opts.model ?? cfg.model ?? DEFAULTS.model;
 
