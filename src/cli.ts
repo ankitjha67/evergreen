@@ -894,6 +894,97 @@ program
     }
   });
 
+// evergreen spec-diff - compare two spec versions
+program
+  .command("spec-diff")
+  .description("Compare two changefeed spec versions to show added/removed/changed rules")
+  .argument("<before>", "path to the older spec JSON")
+  .argument("<after>", "path to the newer spec JSON")
+  .option("--json", "machine-readable output", false)
+  .action(async (beforePath: string, afterPath: string, o: { json: boolean }) => {
+    try {
+      const { loadSpec } = await import("./changefeed/loader.js");
+      const { diffSpecs, formatSpecDiff } = await import("./spec-diff.js");
+
+      const before = await loadSpec(resolve(beforePath));
+      const after = await loadSpec(resolve(afterPath));
+      const diff = diffSpecs(before, after);
+
+      if (o.json) {
+        console.log(JSON.stringify(diff, null, 2));
+      } else {
+        console.log();
+        console.log(formatSpecDiff(diff));
+        console.log();
+      }
+    } catch (e: any) {
+      console.error(`Spec diff failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen doctor - config health check
+program
+  .command("doctor")
+  .description("Validate environment, config, providers, and spec integrity")
+  .option("--repo <path>", "target repository", process.cwd())
+  .option("--specs-dir <path>", "directory containing specs", "specs")
+  .option("--json", "machine-readable output", false)
+  .action(async (o: any) => {
+    try {
+      const { runDoctor, formatDoctorReport } = await import("./doctor.js");
+      const report = await runDoctor(resolve(o.repo), resolve(o.specsDir));
+
+      if (o.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        console.log();
+        console.log(formatDoctorReport(report));
+        console.log();
+      }
+      process.exitCode = report.healthy ? 0 : 1;
+    } catch (e: any) {
+      console.error(`Doctor failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen export - export data as CSV/JSON
+program
+  .command("export")
+  .description("Export scan results, migration history, or findings as CSV/JSON")
+  .argument("<target>", "what to export: history, scan, or findings")
+  .option("--format <fmt>", "output format: json or csv", "csv")
+  .option("--out <file>", "output file path (prints to stdout if omitted)")
+  .option("--repo <path>", "filter by repository")
+  .option("--spec <ref>", "filter by spec reference")
+  .option("--since <date>", "filter by date (ISO format)")
+  .option("--limit <n>", "max records", "1000")
+  .action(async (target: string, o: any) => {
+    try {
+      const { exportData, parseExportFormat, parseExportTarget } = await import("./export.js");
+
+      const result = await exportData({
+        format: parseExportFormat(o.format),
+        target: parseExportTarget(target),
+        outPath: o.out,
+        repo: o.repo,
+        specRef: o.spec,
+        since: o.since,
+        limit: parseInt(o.limit, 10),
+      });
+
+      if (o.out) {
+        console.log(`Exported ${result.records} record(s) to ${result.savedTo} (${result.format})`);
+      } else {
+        console.log(result.output);
+      }
+    } catch (e: any) {
+      console.error(`Export failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
 // evergreen notify - send a test notification
 program
   .command("notify")
