@@ -298,6 +298,42 @@ program
     }
   });
 
+// evergreen fetch-registry - download specs from a remote registry index
+program
+  .command("fetch-registry")
+  .description("Download changefeed specs from a remote registry index URL")
+  .argument("<url>", "HTTP(S) URL to a registry index JSON")
+  .option("--out <dir>", "output directory", "specs")
+  .option("--lang <language>", "filter by language (e.g. ruby, go, python)")
+  .option("--vendor <vendor>", "filter by vendor slug (e.g. stripe)")
+  .action(async (url: string, o: { out: string; lang?: string; vendor?: string }) => {
+    try {
+      const { fetchFromIndex } = await import("./changefeed/registry-index.js");
+      const result = await fetchFromIndex(url, resolve(o.out), { lang: o.lang, vendor: o.vendor });
+
+      if (result.fetched.length > 0) {
+        console.log(`\nFetched ${result.fetched.length} spec(s):`);
+        for (const f of result.fetched) {
+          console.log(`  ${f.savedTo}`);
+        }
+      }
+      if (result.errors.length > 0) {
+        console.log(`\nErrors (${result.errors.length}):`);
+        for (const e of result.errors) {
+          console.error(`  ${e.ref}: ${e.error}`);
+        }
+        process.exitCode = 1;
+      }
+      if (result.fetched.length === 0 && result.errors.length === 0) {
+        console.log("No specs matched the filters.");
+      }
+      console.log();
+    } catch (e: any) {
+      console.error(`Failed to fetch registry: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
 program
   .command("serve")
   .description("Start the GitHub App webhook server (FR-08)")

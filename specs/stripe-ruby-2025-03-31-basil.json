@@ -1,0 +1,63 @@
+{
+  "specVersion": "1",
+  "vendor": "stripe",
+  "api": "stripe-ruby",
+  "version": "2025-03-31.basil",
+  "title": "Stripe Ruby SDK 2025-03-31 (basil) breaking changes",
+  "docsUrl": "https://docs.stripe.com/changelog/basil",
+  "deadline": "2026-12-31",
+  "languages": ["ruby"],
+  "changes": [
+    {
+      "id": "stripe-rb-basil-001",
+      "severity": "breaking",
+      "title": "Upcoming invoice endpoints replaced by Create Preview Invoice",
+      "description": "The Stripe::Invoice.upcoming and Stripe::InvoiceLineItem.list(invoice: 'upcoming') methods were removed in API version 2025-03-31.basil. They are replaced by Stripe::Invoice.create_preview, which returns the same preview invoice object.",
+      "detect": {
+        "patterns": ["Stripe::Invoice\\.upcoming\\b", "invoice:\\s*['\"]upcoming['\"]"],
+        "filePatterns": ["**/*.rb"],
+        "notes": "Parameters largely carry over: customer, subscription, subscription_items map to the same names on create_preview; subscription_* flat params moved under subscription_details in basil."
+      },
+      "replace": {
+        "guidance": "Replace Stripe::Invoice.upcoming(params) with Stripe::Invoice.create_preview(params). Move subscription_items and subscription_proration_date under subscription_details: { items: ..., proration_date: ... }. For listing upcoming line items, create the preview first, then use Stripe::InvoiceLineItem.list(invoice: preview.id).",
+        "before": "upcoming = Stripe::Invoice.upcoming(customer: customer_id)",
+        "after": "upcoming = Stripe::Invoice.create_preview(customer: customer_id)",
+        "docsUrl": "https://docs.stripe.com/api/invoices/create_preview"
+      }
+    },
+    {
+      "id": "stripe-rb-basil-002",
+      "severity": "breaking",
+      "title": "Subscription current_period_start/end moved to subscription items",
+      "description": "In 2025-03-31.basil, the current_period_start and current_period_end attributes were removed from the Subscription resource. Billing periods are now tracked per subscription item.",
+      "detect": {
+        "patterns": ["\\.current_period_(start|end)\\b", "\\[(['\"])current_period_(start|end)\\1\\]"],
+        "filePatterns": ["**/*.rb"],
+        "notes": "Only flag reads from a Subscription object; reads already on items.data[...] are the NEW pattern and must not be rewritten."
+      },
+      "replace": {
+        "guidance": "Replace subscription.current_period_end with subscription.items.data[0].current_period_end for single-item subscriptions. For multi-item subscriptions, iterate items to find the relevant item's period.",
+        "before": "renews_at = subscription.current_period_end",
+        "after": "renews_at = subscription.items.data[0].current_period_end",
+        "docsUrl": "https://docs.stripe.com/changelog/basil#subscriptions"
+      }
+    },
+    {
+      "id": "stripe-rb-basil-003",
+      "severity": "breaking",
+      "title": "Stripe.api_key global assignment replaced by StripeClient",
+      "description": "The global Stripe.api_key = 'sk_...' pattern and class-level methods like Stripe::Charge.create are deprecated. Use the instance-based StripeClient pattern: client = Stripe::StripeClient.new('sk_...') then client.charges.create(params).",
+      "detect": {
+        "patterns": ["Stripe\\.api_key\\s*=", "Stripe::(Charge|Customer|Invoice|Subscription|PaymentIntent|PaymentMethod|Product|Price|Refund|SetupIntent|BalanceTransaction|Payout|Transfer)\\.(create|retrieve|update|delete|list)\\b"],
+        "filePatterns": ["**/*.rb"],
+        "notes": "The StripeClient pattern supports per-request API keys and is thread-safe. Detect both the api_key assignment and direct class-level resource access."
+      },
+      "replace": {
+        "guidance": "Replace 'Stripe.api_key = key' + 'Stripe::Charge.create(...)' with 'client = Stripe::StripeClient.new(key)' + 'client.charges.create(params: ...)'. The resource names change from PascalCase class methods to snake_case client attributes: Charge->charges, Customer->customers, PaymentIntent->payment_intents, etc.",
+        "before": "Stripe.api_key = ENV['STRIPE_KEY']\ncharge = Stripe::Charge.create(amount: 1000, currency: 'usd')",
+        "after": "client = Stripe::StripeClient.new(ENV['STRIPE_KEY'])\ncharge = client.charges.create(params: { amount: 1000, currency: 'usd' })",
+        "docsUrl": "https://docs.stripe.com/development/quickstart?lang=ruby"
+      }
+    }
+  ]
+}

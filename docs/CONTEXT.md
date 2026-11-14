@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change -> update FSD first. Structural change -> ARCHITECTURE/SYSTEM_DESIGN first. New decision -> log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.9 complete + dynamic model discovery branch -- 118 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests.
+**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go language support -- 143 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests. **Ruby/Go support + spec registry (2026-11-14)**: 5 bundled specs across 4 languages, spec registry index fetch, 143 tests.
 
 | Workstream | State |
 |---|---|
@@ -52,6 +52,9 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Provider CLI (FR-09) | ✅ `evergreen providers` list command + `--provider` flag on migrate |
 | Dockerfile | ✅ Multi-stage build, git-enabled, production-ready |
 | Python language support | ✅ Stripe Python SDK changefeed spec (3 rules), Python fixture repo, scanner handles Python file patterns |
+| Ruby language support | ✅ Stripe Ruby SDK changefeed spec (3 rules), Ruby fixture repo (`fixtures/demo-repo-ruby/`), scanner handles `**/*.rb` patterns |
+| Go language support | ✅ Stripe Go SDK changefeed spec (3 rules), Go fixture repo (`fixtures/demo-repo-go/`), scanner handles `**/*.go` patterns |
+| Spec registry index | ✅ `fetchRegistryIndex()` + `fetchFromIndex()` in `src/changefeed/registry-index.ts`, `evergreen fetch-registry` CLI command with `--lang`/`--vendor` filters |
 | `evergreen validate` CLI | ✅ Validates changefeed spec JSON, shows structured info, `--json` flag |
 | `.evergreen.yaml` config | ✅ YAML config fallback (key-value, comments, list items), `evergreen init` command |
 | specRef collision fix | ✅ `specRef` now `vendor@api@version` -- multi-language specs no longer collide in registry |
@@ -81,12 +84,23 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | D13 | 2026-11-13 | OpenAI-compatible pattern for multi-provider (not per-SDK) | One OpenAI SDK + configurable baseURL covers 12+ providers (Ollama, NIM, Groq, etc.) with zero additional dependencies | FSD FR-09, src/providers/openai-compat.ts |
 
 ## 5. Open Questions (owner: founder)
-- OQ-1: Python vs Go as 2nd language (PRD §10.1)
+- OQ-1: ~~Python vs Go as 2nd language~~ **RESOLVED**: Both added (Session 7: Python, Session 12: Ruby + Go)
 - OQ-2: Apache-2 the spec format day-one? (leaning yes -- PRD §10.2)
 - OQ-3: Independent verifier model vs self-reported confidence (PRD §10.3, revisit at 0.2)
 - OQ-4: Product name/domain (Evergreen is provisional -- D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-14 -- Session 12 (Ruby/Go language support, spec registry index)
+- **Stripe Ruby SDK changefeed spec** (`specs/stripe-ruby-2025-03-31-basil.json`): 3 rules covering `Stripe::Invoice.upcoming` -> `Stripe::Invoice.create_preview`, `current_period_start/end` -> `items.data[0]`, and `Stripe.api_key` -> `Stripe::StripeClient.new` pattern. Ruby-specific `filePatterns: ["**/*.rb"]`.
+- **Ruby fixture repo** (`fixtures/demo-repo-ruby/`): `billing.rb` + `webhooks.rb` with realistic Stripe Ruby SDK calls. Scanner finds 5+ affected sites across all 3 rules.
+- **Stripe Go SDK changefeed spec** (`specs/stripe-go-2025-03-31-basil.json`): 3 rules covering `invoice.GetNext`/`invoice.Upcoming` -> `invoice.CreatePreview`, `CurrentPeriodEnd`/`CurrentPeriodStart` -> `Items.Data[0]`, and `stripe.Key` -> `client.API` pattern. Go-specific `filePatterns: ["**/*.go"]`.
+- **Go fixture repo** (`fixtures/demo-repo-go/`): `billing.go` + `webhooks.go` with realistic Stripe Go SDK calls. Scanner finds 5+ affected sites across all 3 rules.
+- **Spec registry index** (`src/changefeed/registry-index.ts`): New module for fetching specs from a remote registry index URL. `fetchRegistryIndex()` downloads and validates index JSON, `fetchFromIndex()` downloads all matching specs with `--lang` and `--vendor` filters.
+- **`evergreen fetch-registry` CLI command**: Downloads changefeed specs from a remote registry index URL with `--lang` and `--vendor` filters. Extends FR-01.3 from single-URL fetch to registry-level fetch.
+- **Tests**: 143 passing across 23 suites (20 new: ruby-spec 6, go-spec 7, registry-index 5, scan-all +2).
+- **5 bundled specs**: JS, Python, OpenAI, Ruby, Go -- covering 4 programming languages.
+- Next: vendor portal, marketplace listing, deploy to Railway/Render.
+
 ### 2026-11-14 -- Session 11 (Dynamic model discovery, fallback chain, configurable tokens)
 - **Dynamic model discovery** (`src/providers/discovery.ts`): New module with `discoverModels()` (cached with 5-min TTL), `selectBestModel()` (picks preferred model or largest context window), and `clearModelCache()`. Providers no longer rely solely on hardcoded `defaultModel` -- they can query their API for available models at runtime.
 - **`listModels()` on core providers**: Added to Anthropic (via `client.models.list()`), OpenAI (via `client.models.list()` async iteration), and Gemini (via REST `generativelanguage.googleapis.com/v1beta/models`). All implementations catch errors gracefully and return empty arrays on failure.
@@ -97,7 +111,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - **ModelInfo type**: New interface `{ id, name?, contextWindow?, maxOutputTokens? }` on `LLMProvider` (optional `listModels()` method).
 - **Config parser updated**: `parseYamlConfig()` now handles `maxInputTokens`, `maxOutputTokens`, and `fallback:` list sections.
 - **Tests**: 118 passing across 20 suites (15 new: discovery cache, selectBestModel, FallbackProvider primary/fallback/all-fail/constructor/composite-id, buildFallbackChain, config token-limits/fallback-list/combined-fields).
-- Next: merge into main, vendor portal, marketplace listing, Ruby/Go language support.
+- Next: merge into main, vendor portal, marketplace listing.
 
 ### 2026-11-13 -- Session 10 (Release 1.0 quality pass -- AI slop removal, README rewrite, security audit)
 - **AI slop removal**: Replaced all em dashes, en dashes, right arrows, left arrows, Unicode ellipses, and warning emojis across the entire codebase with ASCII equivalents. Source files use `-`, docs use `--`, arrows use `->`. Zero non-ASCII punctuation remaining in `.ts`, `.md`, or `.json` files (fixture demo repos excluded as they simulate real customer code).

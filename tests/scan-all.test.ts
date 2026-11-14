@@ -46,6 +46,42 @@ describe("scan-all multi-spec", () => {
     expect(results[0].findings).toBeGreaterThan(0);
   });
 
+  it("scans Ruby fixture against Ruby specs", async () => {
+    const registry = new SpecRegistry();
+    await registry.loadFromDirectory(SPECS_DIR);
+
+    const rubySpecs = registry.forLanguage("ruby");
+    expect(rubySpecs.length).toBeGreaterThanOrEqual(1);
+
+    const repo = resolve("fixtures/demo-repo-ruby");
+    const results = await Promise.all(
+      rubySpecs.map(async (spec) => {
+        const result = await scan(repo, spec);
+        return { ref: specRef(spec), findings: result.findings.length };
+      }),
+    );
+
+    expect(results[0].findings).toBeGreaterThan(0);
+  });
+
+  it("scans Go fixture against Go specs", async () => {
+    const registry = new SpecRegistry();
+    await registry.loadFromDirectory(SPECS_DIR);
+
+    const goSpecs = registry.forLanguage("go");
+    expect(goSpecs.length).toBeGreaterThanOrEqual(1);
+
+    const repo = resolve("fixtures/demo-repo-go");
+    const results = await Promise.all(
+      goSpecs.map(async (spec) => {
+        const result = await scan(repo, spec);
+        return { ref: specRef(spec), findings: result.findings.length };
+      }),
+    );
+
+    expect(results[0].findings).toBeGreaterThan(0);
+  });
+
   it("concurrent scanning produces same results as sequential", async () => {
     const registry = new SpecRegistry();
     await registry.loadFromDirectory(SPECS_DIR);

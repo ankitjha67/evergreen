@@ -1,0 +1,63 @@
+{
+  "specVersion": "1",
+  "vendor": "stripe",
+  "api": "stripe-go",
+  "version": "2025-03-31.basil",
+  "title": "Stripe Go SDK 2025-03-31 (basil) breaking changes",
+  "docsUrl": "https://docs.stripe.com/changelog/basil",
+  "deadline": "2026-12-31",
+  "languages": ["go"],
+  "changes": [
+    {
+      "id": "stripe-go-basil-001",
+      "severity": "breaking",
+      "title": "Upcoming invoice endpoints replaced by Create Preview Invoice",
+      "description": "The invoice.GetNext (or invoice.Upcoming) function was removed in API version 2025-03-31.basil. It is replaced by invoice.CreatePreview, which returns the same preview invoice object.",
+      "detect": {
+        "patterns": ["invoice\\.GetNext\\b", "invoice\\.Upcoming\\b", "InvoiceUpcomingParams"],
+        "filePatterns": ["**/*.go"],
+        "notes": "Parameters largely carry over: Customer, Subscription, SubscriptionItems map to the same fields on CreatePreview params; SubscriptionProration* fields moved under SubscriptionDetails in basil."
+      },
+      "replace": {
+        "guidance": "Replace invoice.GetNext(params) or invoice.Upcoming(params) with invoice.CreatePreview(params). Replace &stripe.InvoiceUpcomingParams{} with &stripe.InvoiceCreatePreviewParams{}. Move SubscriptionItems and SubscriptionProrationDate under SubscriptionDetails.",
+        "before": "upcoming, err := invoice.GetNext(&stripe.InvoiceUpcomingParams{Customer: stripe.String(customerID)})",
+        "after": "preview, err := invoice.CreatePreview(&stripe.InvoiceCreatePreviewParams{Customer: stripe.String(customerID)})",
+        "docsUrl": "https://docs.stripe.com/api/invoices/create_preview"
+      }
+    },
+    {
+      "id": "stripe-go-basil-002",
+      "severity": "breaking",
+      "title": "Subscription CurrentPeriodStart/End moved to subscription items",
+      "description": "In 2025-03-31.basil, the CurrentPeriodStart and CurrentPeriodEnd fields were removed from the stripe.Subscription struct. Billing periods are now tracked per subscription item.",
+      "detect": {
+        "patterns": ["\\.CurrentPeriodEnd\\b", "\\.CurrentPeriodStart\\b"],
+        "filePatterns": ["**/*.go"],
+        "notes": "Only flag reads from a Subscription object; reads already on Items.Data[...] are the NEW pattern and must not be rewritten."
+      },
+      "replace": {
+        "guidance": "Replace sub.CurrentPeriodEnd with sub.Items.Data[0].CurrentPeriodEnd for single-item subscriptions. For multi-item subscriptions, iterate Items.Data to find the relevant item's period.",
+        "before": "renewsAt := sub.CurrentPeriodEnd",
+        "after": "renewsAt := sub.Items.Data[0].CurrentPeriodEnd",
+        "docsUrl": "https://docs.stripe.com/changelog/basil#subscriptions"
+      }
+    },
+    {
+      "id": "stripe-go-basil-003",
+      "severity": "breaking",
+      "title": "stripe.Key global replaced by client.API with per-client keys",
+      "description": "The global stripe.Key = 'sk_...' pattern and package-level functions like charge.New are deprecated. Use the client.API pattern with per-client keys for thread safety.",
+      "detect": {
+        "patterns": ["stripe\\.Key\\s*=", "charge\\.New\\b", "customer\\.New\\b", "sub\\.New\\b", "paymentintent\\.New\\b", "invoice\\.New\\b"],
+        "filePatterns": ["**/*.go"],
+        "notes": "The client.API pattern is thread-safe and supports per-request API keys."
+      },
+      "replace": {
+        "guidance": "Replace 'stripe.Key = key' + 'charge.New(params)' with 'sc := client.API{Charges: &charge.Client{B: stripe.GetBackend(stripe.APIBackend), Key: key}}' or use the stripe/client package. The per-client pattern allows multiple API keys in the same process.",
+        "before": "stripe.Key = os.Getenv(\"STRIPE_KEY\")\nc, err := charge.New(&stripe.ChargeParams{Amount: stripe.Int64(1000), Currency: stripe.String(\"usd\")})",
+        "after": "sc := &client.API{}\nsc.Init(os.Getenv(\"STRIPE_KEY\"), nil)\nc, err := sc.Charges.New(&stripe.ChargeParams{Amount: stripe.Int64(1000), Currency: stripe.String(\"usd\")})",
+        "docsUrl": "https://docs.stripe.com/development/quickstart?lang=go"
+      }
+    }
+  ]
+}
