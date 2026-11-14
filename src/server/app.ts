@@ -6,10 +6,11 @@ import { readFileSync, watch } from "node:fs";
 import { createAppOctokit, AppConfig } from "../github/client.js";
 import { SpecRegistry } from "../registry/specs.js";
 import { handlePush, handlePullRequest, handleInstallation, WebhookContext } from "./webhooks.js";
-import { getUsageSummary } from "../usage.js";
+import { getUsageSummary, type UsageRecord } from "../usage.js";
 import { EventLog, type WebhookEvent } from "./event-log.js";
 import { specRef } from "../types.js";
 import { renderDashboard } from "./dashboard.js";
+import { buildCampaignStats } from "./campaigns.js";
 
 export interface ServerConfig {
   port: number;
@@ -221,6 +222,19 @@ export async function createServer(config: ServerConfig) {
     const raw = parseInt((req.query.limit as string) ?? "50", 10);
     const limit = Number.isNaN(raw) ? 50 : Math.min(Math.max(raw, 1), 500);
     res.json({ events: eventLog.recent(limit), stats: eventLog.stats() });
+  });
+
+  // FR-06.2 - Vendor campaign analytics API
+  app.get("/api/campaigns", async (req, res) => {
+    try {
+      const summary = await getUsageSummary(undefined, 10000);
+      const campaigns = buildCampaignStats(summary.recentEvents as UsageRecord[]);
+      const vendor = req.query.vendor as string | undefined;
+      const filtered = vendor ? campaigns.filter((c) => c.vendor === vendor) : campaigns;
+      res.json({ count: filtered.length, campaigns: filtered });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Admin dashboard

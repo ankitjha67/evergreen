@@ -579,6 +579,107 @@ program
     console.log(`To configure fallback: MIGRATION_FALLBACK_PROVIDERS=openai,gemini or use .evergreen.yaml\n`);
   });
 
+// evergreen estimate - estimate migration cost before running the agent
+common(program.command("estimate").description("Estimate LLM cost for migrating a repo against a spec (no agent run)"))
+  .option("--model <id>", "model to estimate for", "claude-opus-5-5")
+  .option("--provider <id>", "provider", "anthropic")
+  .action(async (o) => {
+    try {
+      const { scanOnly } = await import("./orchestrator.js");
+      const { estimateMigrationCost } = await import("./estimate.js");
+      const { specRef } = await import("./types.js");
+
+      const { spec, outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: false, json: false });
+      const findings = outcome.scan.findings;
+
+      if (findings.length === 0) {
+        console.log("\nNo findings - migration would cost $0.00\n");
+        process.exitCode = 0;
+        return;
+      }
+
+      const est = await estimateMigrationCost(resolve(o.repo), findings, o.model, o.provider);
+
+      if (o.json) {
+        console.log(JSON.stringify(est, null, 2));
+      } else {
+        console.log(`\nCost Estimate: ${specRef(spec)}`);
+        console.log("─".repeat(50));
+        console.log(`  Model:            ${est.model} (${est.provider})`);
+        console.log(`  Findings:         ${est.findings}`);
+        console.log(`  Affected files:   ${est.affectedFiles}`);
+        console.log(`  Est. input tokens:  ${est.estimatedInputTokens.toLocaleString()}`);
+        console.log(`  Est. output tokens: ${est.estimatedOutputTokens.toLocaleString()}`);
+        console.log(`  Est. cost:        $${est.estimatedCostUSD}`);
+        console.log(`  Confidence:       ${est.confidence}`);
+        if (est.pricing) {
+          console.log(`  Pricing:          $${est.pricing.inputPerMTok}/MTok in, $${est.pricing.outputPerMTok}/MTok out`);
+        } else {
+          console.log(`  Pricing:          (unknown model - cost is $0)`);
+        }
+        console.log();
+      }
+      process.exitCode = 0;
+    } catch (e) {
+      fail(e);
+    }
+  });
+
+// evergreen batch-scan - scan multiple repos from a manifest
+program
+  .command("batch-scan")
+  .description("Scan multiple repos from a manifest file against all matching specs")
+  .argument("<manifest>", "path to manifest file (JSON array or newline-separated repo paths)")
+  .option("--specs-dir <path>", "directory containing specs", "specs")
+  .option("--lang <language>", "filter specs by language")
+  .option("--concurrency <n>", "parallel repo scans", "4")
+  .option("--json", "machine-readable output", false)
+  .action(async (manifest: string, o: { specsDir: string; lang?: string; concurrency: string; json: boolean }) => {
+    try {
+      const { loadManifest, batchScan } = await import("./batch.js");
+      const m = await loadManifest(resolve(manifest));
+      console.log(`\nScanning ${m.repos.length} repo(s)...\n`);
+
+      const result = await batchScan(m, o.specsDir, {
+        lang: o.lang,
+        concurrency: parseInt(o.concurrency, 10),
+      });
+
+      if (o.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(`Batch Scan Complete`);
+        console.log("─".repeat(50));
+        console.log(`  Repos scanned:   ${result.totalRepos}`);
+        console.log(`  Specs checked:   ${result.totalSpecs}`);
+        console.log(`  Repos affected:  ${result.reposAffected}`);
+        console.log(`  Total findings:  ${result.totalFindings}`);
+        console.log(`  Duration:        ${result.durationMs}ms`);
+
+        const affected = result.results.filter((r) => r.findings > 0);
+        if (affected.length > 0) {
+          console.log(`\nAffected repos:`);
+          for (const r of affected) {
+            console.log(`  ${r.repo} | ${r.specRef} | ${r.findings} finding(s)`);
+          }
+        }
+
+        const errors = result.results.filter((r) => r.error);
+        if (errors.length > 0) {
+          console.log(`\nErrors:`);
+          for (const r of errors) {
+            console.error(`  ${r.repo}: ${r.error}`);
+          }
+        }
+        console.log();
+      }
+      process.exitCode = result.results.some((r) => r.error) ? 1 : 0;
+    } catch (e: any) {
+      console.error(`Batch scan failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
 function fail(e: unknown): void {
   if (e instanceof SpecValidationError) {
     console.error(e.message);
