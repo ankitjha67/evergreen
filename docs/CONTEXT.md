@@ -33,11 +33,11 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Triage (FR-03.2) | ✅ **verified live** -- Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
 | Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
 | 2nd changefeed (openai v4) | ✅ **verified live** -- assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
-| Tests | ✅ vitest, **118 passing** across 20 suites |
+| Tests | ✅ vitest, **279 passing** across 38 suites |
 | Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
 | Migration agent (FR-04) | ✅ **verified live** -- Opus 5.5 migrated both files correctly |
 | Delivery + report (FR-05/06) | ✅ **verified live** -- single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
-| CLI (FR-07) | ✅ scan/migrate/report/serve |
+| CLI (FR-07) | ✅ 28 commands: scan, migrate, report, serve, providers, estimate, validate, diff, fetch-spec, specs, scan-all, batch-scan, openapi-diff, verify-specs, create-spec, history, notify, fetch-registry, doctor, export, spec-diff, rollback, templates, from-template, cost-compare, init, usage |
 | GitHub App server (FR-08.2) | ✅ Express + webhook signature verification |
 | Webhook handlers (FR-08.2/4) | ✅ push (default-branch only), pull_request (opened/sync/reopen), installation |
 | Shallow clone (FR-08.3) | ✅ installation token auth, temp dir cleanup |
