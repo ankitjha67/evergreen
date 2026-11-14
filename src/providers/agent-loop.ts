@@ -9,6 +9,8 @@ export interface AgentLoopOptions {
   maxTurns?: number;
   temperature?: number;
   maxTokens?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
 }
 
 export interface AgentLoopResult {
@@ -37,6 +39,8 @@ export async function runAgentLoop(
 
   const chatOpts: ChatOptions = {
     maxTokens: opts.maxTokens ?? 16384,
+    maxInputTokens: opts.maxInputTokens,
+    maxOutputTokens: opts.maxOutputTokens,
     temperature: opts.temperature ?? 0,
   };
 

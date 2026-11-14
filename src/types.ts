@@ -94,6 +94,9 @@ export interface RepoConfig {
   confidenceThreshold?: number;
   model?: string;
   provider?: string;
+  fallbackProviders?: string[];
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
 }
 
 export interface MigrateOptions {
@@ -108,6 +111,9 @@ export interface MigrateOptions {
   provider?: string;
   threshold?: number;
   json?: boolean;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  fallbackProviders?: string[];
 }
 
 export class SpecValidationError extends Error {

@@ -1,5 +1,5 @@
 // FR-09.2 - Google Gemini provider via @google/generative-ai SDK
-import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
+import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig, ModelInfo } from "./types.js";
 
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
@@ -12,6 +12,25 @@ export class GeminiProvider implements LLMProvider {
     this.defaultModel = config.model ?? "gemini-2.5-pro";
     this.apiKey = config.apiKey ?? process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? "";
     if (!this.apiKey) throw new Error("GOOGLE_API_KEY or GEMINI_API_KEY is required for the Gemini provider");
+  }
+
+  async listModels(): Promise<ModelInfo[]> {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json() as { models?: { name: string; displayName?: string; inputTokenLimit?: number; outputTokenLimit?: number }[] };
+      return (data.models ?? [])
+        .filter((m) => m.name.startsWith("models/gemini"))
+        .map((m) => ({
+          id: m.name.replace("models/", ""),
+          name: m.displayName ?? m.name,
+          contextWindow: m.inputTokenLimit,
+          maxOutputTokens: m.outputTokenLimit,
+        }));
+    } catch {
+      return [];
+    }
   }
 
   async chat(messages: ChatMessage[], tools?: ToolDef[], options?: ChatOptions): Promise<ChatResponse> {
@@ -33,7 +52,7 @@ export class GeminiProvider implements LLMProvider {
     const request: any = {
       contents,
       generationConfig: {
-        maxOutputTokens: options?.maxTokens ?? 16384,
+        maxOutputTokens: options?.maxOutputTokens ?? options?.maxTokens ?? 16384,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
     };

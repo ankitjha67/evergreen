@@ -42,6 +42,9 @@ common(program.command("migrate").description("Scan, then run the migration agen
   .option("--model <id>", "migration model override")
   .option("--provider <id>", "LLM provider (anthropic, openai, gemini, ollama, groq, etc.)")
   .option("--threshold <n>", "confidence gate 0..1", parseFloat)
+  .option("--max-input-tokens <n>", "max input tokens per request", parseInt)
+  .option("--max-output-tokens <n>", "max output tokens per response", parseInt)
+  .option("--fallback <ids>", "comma-separated fallback provider IDs")
   .action(async (o) => {
     try {
       const { outcome } = await migrate({
@@ -56,6 +59,9 @@ common(program.command("migrate").description("Scan, then run the migration agen
         provider: o.provider,
         threshold: o.threshold,
         json: o.json,
+        maxInputTokens: o.maxInputTokens,
+        maxOutputTokens: o.maxOutputTokens,
+        fallbackProviders: o.fallback ? o.fallback.split(",").map((s: string) => s.trim()) : undefined,
       });
       if (o.json) {
         console.log(JSON.stringify(outcome, null, 2));
@@ -179,7 +185,7 @@ program
 # LLM provider for migrations (default: anthropic)
 # provider: anthropic
 
-# Model override (default: provider's default model)
+# Model override (default: auto-discovered from provider API)
 # model: claude-opus-5-5
 
 # Confidence threshold - files below this score are reverted (0..1)
@@ -190,6 +196,15 @@ threshold: 0.7
 
 # Auto-triage findings with Haiku before migrating
 triage: true
+
+# Token limits - adjust per provider/model requirements
+# maxInputTokens: 200000
+# maxOutputTokens: 16384
+
+# Fallback providers - tried in order if primary fails (model deprecated, API down, etc.)
+# fallback:
+#   - openai
+#   - gemini
 
 # Specs to watch (vendor@api references). Empty = scan against all bundled specs.
 # specs:
@@ -469,18 +484,63 @@ program
 program
   .command("providers")
   .description("List available LLM providers and their configuration status (FR-09)")
-  .action(async () => {
-    const { listAvailableProviders } = await import("./providers/registry.js");
+  .option("--discover", "ping configured providers to discover available models", false)
+  .option("--json", "machine-readable output", false)
+  .action(async (o) => {
+    const { listAvailableProviders, discoverProviderModels } = await import("./providers/registry.js");
     const providers = listAvailableProviders();
+
+    if (o.json) {
+      const result = [];
+      for (const { preset, configured } of providers) {
+        const entry: any = { id: preset.id, name: preset.name, configured, defaultModel: preset.defaultModel };
+        if (o.discover && configured) {
+          try {
+            entry.models = await discoverProviderModels(preset.id);
+          } catch { entry.models = []; }
+        }
+        result.push(entry);
+      }
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
     console.log("\nAvailable LLM Providers:\n");
-    console.log("  Status  | ID                | Name");
-    console.log("  --------+-------------------+-------------------------------------");
+    console.log("  Status  | ID                | Name                                 | Default Model");
+    console.log("  --------+-------------------+--------------------------------------+---------------------------");
     for (const { preset, configured } of providers) {
       const status = configured ? "  ✓ ready" : "  ✗ needs key";
-      console.log(`${status.padEnd(10)}| ${preset.id.padEnd(18)}| ${preset.name}`);
+      console.log(`${status.padEnd(10)}| ${preset.id.padEnd(18)}| ${preset.name.padEnd(37)}| ${preset.defaultModel}`);
     }
+
+    if (o.discover) {
+      const configured = providers.filter((p) => p.configured);
+      if (configured.length > 0) {
+        console.log("\nDiscovering models from configured providers...\n");
+        for (const { preset } of configured) {
+          try {
+            const models = await discoverProviderModels(preset.id);
+            if (models.length > 0) {
+              console.log(`  ${preset.name} (${models.length} models):`);
+              for (const m of models.slice(0, 10)) {
+                const ctx = m.contextWindow ? `  ctx:${(m.contextWindow / 1000).toFixed(0)}k` : "";
+                const out = m.maxOutputTokens ? `  out:${(m.maxOutputTokens / 1000).toFixed(0)}k` : "";
+                console.log(`    ${m.id}${ctx}${out}`);
+              }
+              if (models.length > 10) console.log(`    ... and ${models.length - 10} more`);
+            } else {
+              console.log(`  ${preset.name}: no models returned (check API key)`);
+            }
+          } catch (e: any) {
+            console.log(`  ${preset.name}: discovery failed - ${e.message}`);
+          }
+        }
+      }
+    }
+
     console.log(`\nTo use a provider: evergreen migrate --spec <file> --provider <id>`);
-    console.log(`Or set MIGRATION_PROVIDER=<id> in your environment.\n`);
+    console.log(`Or set MIGRATION_PROVIDER=<id> in your environment.`);
+    console.log(`To configure fallback: MIGRATION_FALLBACK_PROVIDERS=openai,gemini or use .evergreen.yaml\n`);
   });
 
 function fail(e: unknown): void {

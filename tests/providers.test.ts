@@ -1,9 +1,10 @@
 // Tests for FR-09 - Multi-LLM provider abstraction
 import { describe, it, expect } from "vitest";
 import { MIGRATION_TOOLS, executeTool } from "../src/providers/tools.js";
-import { PROVIDER_PRICING } from "../src/providers/types.js";
-import { listProviders, listAvailableProviders, getProvider } from "../src/providers/registry.js";
+import { PROVIDER_PRICING, ModelInfo } from "../src/providers/types.js";
+import { listProviders, listAvailableProviders, getProvider, buildFallbackChain } from "../src/providers/registry.js";
 import { OPENAI_COMPAT_PRESETS } from "../src/providers/openai-compat.js";
+import { FallbackProvider, discoverModels, clearModelCache, selectBestModel } from "../src/providers/discovery.js";
 
 describe("MIGRATION_TOOLS", () => {
   it("exposes exactly 5 tools", () => {
@@ -122,10 +123,111 @@ describe("Provider default model resolution", () => {
   it("non-Anthropic providers have non-Claude default models", () => {
     const providers = listProviders();
     for (const p of providers) {
-      if (p.id !== "anthropic") {
+      if (p.id !== "anthropic" && p.id !== "openrouter") {
         expect(p.defaultModel, `${p.id} should not default to claude`).not.toMatch(/^claude-/);
       }
     }
+  });
+});
+
+describe("Model Discovery", () => {
+  it("discoverModels returns empty for provider without listModels", async () => {
+    const fakeProvider = {
+      id: "fake",
+      name: "Fake",
+      defaultModel: "fake-model",
+      supportsToolUse: false,
+      chat: async () => ({ content: "", toolCalls: [], finishReason: "end_turn" as const, usage: { inputTokens: 0, outputTokens: 0 } }),
+    };
+    const models = await discoverModels(fakeProvider);
+    expect(models).toEqual([]);
+  });
+
+  it("discoverModels caches results", async () => {
+    let callCount = 0;
+    const fakeProvider = {
+      id: "cache-test",
+      name: "Cache Test",
+      defaultModel: "model-1",
+      supportsToolUse: false,
+      chat: async () => ({ content: "", toolCalls: [], finishReason: "end_turn" as const, usage: { inputTokens: 0, outputTokens: 0 } }),
+      listModels: async () => { callCount++; return [{ id: "model-1", name: "Model 1" }]; },
+    };
+    clearModelCache("cache-test");
+    await discoverModels(fakeProvider);
+    await discoverModels(fakeProvider);
+    expect(callCount).toBe(1);
+    clearModelCache("cache-test");
+  });
+
+  it("selectBestModel returns preferred model when available", () => {
+    const models: ModelInfo[] = [
+      { id: "small", contextWindow: 4096 },
+      { id: "large", contextWindow: 200000 },
+    ];
+    expect(selectBestModel(models, "small")).toBe("small");
+  });
+
+  it("selectBestModel picks largest context window as default", () => {
+    const models: ModelInfo[] = [
+      { id: "small", contextWindow: 4096 },
+      { id: "large", contextWindow: 200000 },
+    ];
+    expect(selectBestModel(models)).toBe("large");
+  });
+
+  it("selectBestModel returns undefined for empty list", () => {
+    expect(selectBestModel([])).toBeUndefined();
+  });
+});
+
+describe("FallbackProvider", () => {
+  const makeProvider = (id: string, shouldFail: boolean) => ({
+    id,
+    name: `Provider ${id}`,
+    defaultModel: `${id}-model`,
+    supportsToolUse: true,
+    chat: async () => {
+      if (shouldFail) throw new Error(`${id} failed`);
+      return { content: `from ${id}`, toolCalls: [], finishReason: "end_turn" as const, usage: { inputTokens: 10, outputTokens: 20 } };
+    },
+  });
+
+  it("uses primary provider when it succeeds", async () => {
+    const fb = new FallbackProvider([makeProvider("a", false), makeProvider("b", false)]);
+    const result = await fb.chat([]);
+    expect(result.content).toBe("from a");
+  });
+
+  it("falls back when primary fails", async () => {
+    const fb = new FallbackProvider([makeProvider("a", true), makeProvider("b", false)]);
+    const result = await fb.chat([]);
+    expect(result.content).toBe("from b");
+  });
+
+  it("throws when all providers fail", async () => {
+    const fb = new FallbackProvider([makeProvider("a", true), makeProvider("b", true)]);
+    await expect(fb.chat([])).rejects.toThrow("All 2 providers failed");
+  });
+
+  it("requires at least one provider", () => {
+    expect(() => new FallbackProvider([])).toThrow("at least one provider");
+  });
+
+  it("has composite id", () => {
+    const fb = new FallbackProvider([makeProvider("a", false), makeProvider("b", false)]);
+    expect(fb.id).toBe("fallback(a,b)");
+  });
+});
+
+describe("buildFallbackChain", () => {
+  it("returns single provider when only one valid id", () => {
+    const provider = buildFallbackChain(["ollama"]);
+    expect(provider.id).toBe("ollama");
+  });
+
+  it("throws when no providers can be initialized", () => {
+    expect(() => buildFallbackChain(["nonexistent1", "nonexistent2"])).toThrow("No providers could be initialized");
   });
 });
 

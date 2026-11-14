@@ -11,7 +11,7 @@ import { scan } from "./scanner/scan.js";
 import { triage, actionable } from "./triage/triage.js";
 import { buildMigrationPrompt } from "./migrator/prompt.js";
 import { runMigrationAgent, runProviderMigration } from "./migrator/agent.js";
-import { getProvider, listProviders } from "./providers/registry.js";
+import { getProvider, listProviders, buildFallbackChain } from "./providers/registry.js";
 import * as git from "./repo/git.js";
 import { renderReport } from "./report/report.js";
 
@@ -104,9 +104,26 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
     const resolvedModel = useProviderLoop && !opts.model && !cfg.model
       ? (listProviders().find((p) => p.id === providerId)?.defaultModel ?? model)
       : model;
-    const run = useProviderLoop
-      ? await runProviderMigration(repo, prompt, getProvider(providerId), resolvedModel)
-      : await runMigrationAgent(repo, prompt, { model });
+
+    // Build provider with fallback chain if configured
+    const fallbackIds = opts.fallbackProviders ?? cfg.fallbackProviders ?? [];
+    let provider;
+    if (useProviderLoop && providerId) {
+      if (fallbackIds.length > 0) {
+        provider = buildFallbackChain([providerId, ...fallbackIds]);
+      } else {
+        provider = getProvider(providerId);
+      }
+    }
+
+    const tokenOpts = {
+      maxInputTokens: opts.maxInputTokens ?? cfg.maxInputTokens,
+      maxOutputTokens: opts.maxOutputTokens ?? cfg.maxOutputTokens,
+    };
+
+    const run = useProviderLoop && provider
+      ? await runProviderMigration(repo, prompt, provider, resolvedModel, tokenOpts)
+      : await runMigrationAgent(repo, prompt, { model, ...tokenOpts });
     outcome.usage = run.usage;
 
     if (!run.manifest) {

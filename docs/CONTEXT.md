@@ -1,6 +1,6 @@
 # CONTEXT.md -- Evergreen Living Context
 **The single source of truth for project state. Read this FIRST before any work. Update it AFTER any work.**
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
 ---
 
@@ -20,8 +20,8 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change -> update FSD first. Structural change -> ARCHITECTURE/SYSTEM_DESIGN first. New decision -> log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.9 complete -- multi-spec scan, retry queue, specs CLI, 103 tests
-**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests.
+**Phase:** Release 0.9 complete + dynamic model discovery branch -- 118 tests
+**Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests.
 
 | Workstream | State |
 |---|---|
@@ -33,7 +33,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Triage (FR-03.2) | ✅ **verified live** -- Haiku flagged 9/9 real sites, discarded the decoy ($0.20/run) |
 | Verify gating (FR-04.6) | ✅ verified live (`node --check` chain, exit 0 recorded in report) |
 | 2nd changefeed (openai v4) | ✅ **verified live** -- assistant.js 0.93 conf, package.json floor ^4 via manifest justification, tickets.js untouched |
-| Tests | ✅ vitest, **103 passing** across 20 suites |
+| Tests | ✅ vitest, **118 passing** across 20 suites |
 | Cost accounting (4 token classes) | ✅ demo2 real cost $0.26 (cache-read dominated), was understated before |
 | Migration agent (FR-04) | ✅ **verified live** -- Opus 5.5 migrated both files correctly |
 | Delivery + report (FR-05/06) | ✅ **verified live** -- single commit on `evergreen/stripe-2025-03-31.basil`, report committed, tree clean on main |
@@ -47,7 +47,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Stripe basil spec + fixture | ✅ specs/stripe-2025-03-31-basil.json + fixtures/demo-repo (git-initialized) |
 | End-to-end demo run | ✅ **MILESTONE M1 ACHIEVED 2026-11-13** -- all 7 sites migrated, confidences 0.85/0.80, customers.js untouched |
 | GitHub App registration | ✅ **Real app registered on github.com** (App ID 5745187, "Evergreen API Scanner"), installed on all repos, end-to-end webhook->scan->Check Run verified on live repo |
-| Multi-LLM providers (FR-09) | ✅ 15 providers: Anthropic, OpenAI, Google Gemini, + 12 OpenAI-compatible (Ollama, NVIDIA NIM, Groq, Together AI, Fireworks AI, DeepSeek, Mistral, Perplexity, Anyscale, Azure OpenAI, OpenRouter, LM Studio, vLLM). Provider-agnostic agent loop with shared tool implementations |
+| Multi-LLM providers (FR-09) | ✅ 15 providers: Anthropic, OpenAI, Google Gemini, + 12 OpenAI-compatible (Ollama, NVIDIA NIM, Groq, Together AI, Fireworks AI, DeepSeek, Mistral, Perplexity, Anyscale, Azure OpenAI, OpenRouter, LM Studio, vLLM). Provider-agnostic agent loop with shared tool implementations. Dynamic model discovery via API, cross-provider fallback chain, configurable token limits |
 | Auto-PR on webhook (FR-10) | ✅ Scan->migrate->push branch->open PR->update Check Run. Gated by `AUTO_MIGRATE=true` env var. Usage tracking to `data/usage.jsonl` |
 | Provider CLI (FR-09) | ✅ `evergreen providers` list command + `--provider` flag on migrate |
 | Dockerfile | ✅ Multi-stage build, git-enabled, production-ready |
@@ -87,6 +87,18 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional -- D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-14 -- Session 11 (Dynamic model discovery, fallback chain, configurable tokens)
+- **Dynamic model discovery** (`src/providers/discovery.ts`): New module with `discoverModels()` (cached with 5-min TTL), `selectBestModel()` (picks preferred model or largest context window), and `clearModelCache()`. Providers no longer rely solely on hardcoded `defaultModel` -- they can query their API for available models at runtime.
+- **`listModels()` on core providers**: Added to Anthropic (via `client.models.list()`), OpenAI (via `client.models.list()` async iteration), and Gemini (via REST `generativelanguage.googleapis.com/v1beta/models`). All implementations catch errors gracefully and return empty arrays on failure.
+- **`FallbackProvider` class**: Wraps multiple `LLMProvider` instances and tries each in order on failure. Aggregates errors when all providers fail. Composite id format: `fallback(a,b,c)`. Requires at least one provider.
+- **Cross-provider fallback chain**: `buildFallbackChain()` in registry constructs a `FallbackProvider` from a list of provider IDs. Configured via `--fallback <ids>` CLI flag, `fallback:` list in `.evergreen.yaml`, or `MIGRATION_FALLBACK_PROVIDERS` env var (comma-separated). If one provider's model is deprecated or API is down, the next configured provider takes over automatically.
+- **Configurable token limits**: `maxInputTokens` and `maxOutputTokens` flow through the entire chain: CLI flags (`--max-input-tokens`, `--max-output-tokens`) -> `MigrateOptions` -> orchestrator -> agent-loop -> `ChatOptions` -> individual provider `chat()` methods. Configurable in `.evergreen.yaml` and `RepoConfig`.
+- **`providers --discover` CLI**: The `evergreen providers` command now supports `--discover` flag to query each configured provider's API for live model lists, and `--json` for machine-readable output.
+- **ModelInfo type**: New interface `{ id, name?, contextWindow?, maxOutputTokens? }` on `LLMProvider` (optional `listModels()` method).
+- **Config parser updated**: `parseYamlConfig()` now handles `maxInputTokens`, `maxOutputTokens`, and `fallback:` list sections.
+- **Tests**: 118 passing across 20 suites (15 new: discovery cache, selectBestModel, FallbackProvider primary/fallback/all-fail/constructor/composite-id, buildFallbackChain, config token-limits/fallback-list/combined-fields).
+- Next: merge into main, vendor portal, marketplace listing, Ruby/Go language support.
+
 ### 2026-11-13 -- Session 10 (Release 1.0 quality pass -- AI slop removal, README rewrite, security audit)
 - **AI slop removal**: Replaced all em dashes, en dashes, right arrows, left arrows, Unicode ellipses, and warning emojis across the entire codebase with ASCII equivalents. Source files use `-`, docs use `--`, arrows use `->`. Zero non-ASCII punctuation remaining in `.ts`, `.md`, or `.json` files (fixture demo repos excluded as they simulate real customer code).
 - **README.md rewrite**: Complete rewrite with accurate state: 103 tests/20 suites, 12 CLI commands, 15 LLM providers, 3 bundled specs, all server endpoints, complete project structure, updated roadmap through 0.9, Docker deployment, GitHub App setup, and contributing guide.
