@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-103%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)](tests/)
 [![Providers](https://img.shields.io/badge/LLM%20providers-15-purple)]()
 [![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)]()
 
@@ -137,6 +137,45 @@ All providers implement a unified `LLMProvider` interface with a single `chat()`
 
 The 12 OpenAI-compatible providers (Ollama through Azure) use the OpenAI SDK with a configurable `baseURL`, so they need zero additional dependencies.
 
+### Dynamic Model Discovery
+
+Providers with an API key can query their endpoint for available models at runtime:
+
+```bash
+# Discover models from all configured providers
+npx tsx src/cli.ts providers --discover
+```
+
+The core providers (Anthropic, OpenAI, Gemini) implement `listModels()` to fetch available models from their API. Results are cached for 5 minutes. When no explicit model is set, `selectBestModel()` picks the model with the largest context window.
+
+### Cross-Provider Fallback
+
+Configure multiple providers as fallbacks -- if one fails (deprecated model, API down, rate limit), the next takes over automatically:
+
+```bash
+# CLI flag
+npx tsx src/cli.ts migrate --spec specs/stripe-2025-03-31-basil.json --fallback openai,gemini
+
+# Environment variable
+export MIGRATION_FALLBACK_PROVIDERS=openai,gemini
+
+# Or in .evergreen.yaml
+# fallback:
+#   - openai
+#   - gemini
+```
+
+### Configurable Token Limits
+
+Set max input and output tokens per migration to match your model's capabilities or budget:
+
+```bash
+npx tsx src/cli.ts migrate --spec specs/stripe-2025-03-31-basil.json \
+  --max-input-tokens 200000 --max-output-tokens 16384
+```
+
+Token limits can also be set in `.evergreen.yaml` (`maxInputTokens`, `maxOutputTokens`).
+
 ---
 
 ## Architecture
@@ -254,6 +293,9 @@ Options:
 | `--no-git` | Edit files in place (no branch, no commit) |
 | `--model <id>` | Override the migration model (default: `claude-opus-5-5`) |
 | `--provider <id>` | LLM provider: `anthropic`, `openai`, `gemini`, `ollama`, `groq`, etc. ([full list](#llm-providers)) |
+| `--fallback <ids>` | Comma-separated fallback provider IDs (e.g., `openai,gemini`) |
+| `--max-input-tokens <n>` | Max input tokens for the LLM |
+| `--max-output-tokens <n>` | Max output tokens for the LLM |
 | `--threshold <n>` | Confidence gate 0..1 (default: 0.80) |
 | `--json` | Machine-readable JSON output |
 
@@ -328,10 +370,17 @@ Shows scan/migration event history, cost totals, token breakdowns, and per-provi
 #### `providers` - List available LLM providers
 
 ```bash
+# List all providers and configuration status
 npx tsx src/cli.ts providers
+
+# Discover available models from configured providers
+npx tsx src/cli.ts providers --discover
+
+# Machine-readable output
+npx tsx src/cli.ts providers --json
 ```
 
-Shows all 15 supported providers with their configuration status (ready vs. needs API key).
+Shows all 15 supported providers with their configuration status (ready vs. needs API key). With `--discover`, queries each configured provider's API for live model lists.
 
 ### Running Demos
 
@@ -594,7 +643,8 @@ evergreen/
 │   │   ├── openai.ts           # OpenAI provider
 │   │   ├── openai-compat.ts    # 12 OpenAI-compatible presets
 │   │   ├── gemini.ts           # Google Gemini provider
-│   │   └── registry.ts         # Provider factory + discovery
+│   │   ├── discovery.ts        # Model discovery cache, FallbackProvider, selectBestModel
+│   │   └── registry.ts         # Provider factory + fallback chain builder
 │   ├── github/
 │   │   ├── client.ts           # GitHub App auth (JWT to installation token)
 │   │   ├── clone.ts            # Shallow clone with token auth
@@ -611,7 +661,7 @@ evergreen/
 │   ├── stripe-2025-03-31-basil.json
 │   ├── stripe-python-2025-03-31-basil.json
 │   └── openai-node-v4.json
-├── tests/                      # Vitest test suite (103 tests, 20 suites)
+├── tests/                      # Vitest test suite (118 tests, 20 suites)
 │   ├── loader.test.ts          # Spec validation, schema enforcement
 │   ├── scanner.test.ts         # Pattern matching, dedup, file filtering
 │   ├── git.test.ts             # Porcelain parsing, branch ops, safety
@@ -670,7 +720,7 @@ npm test
 npx vitest run --reporter=verbose
 ```
 
-**103 tests** across **20 suites**:
+**118 tests** across **20 suites**:
 - **Loader** - spec validation, schema enforcement, edge cases
 - **Scanner** - pattern matching, multi-rule dedup, file filtering
 - **Git** - porcelain parsing, branch operations, safety checks
@@ -678,14 +728,14 @@ npx vitest run --reporter=verbose
 - **Checks** - annotation mapping, 50-annotation batching, conclusion logic
 - **Registry** - spec loading, language filtering, lookup
 - **Server** - health endpoint, webhook signature verification
-- **Providers** - registry discovery, tool definitions, pricing map, path-traversal prevention, preset validation
+- **Providers** - registry discovery, tool definitions, pricing map, path-traversal prevention, preset validation, model discovery cache, FallbackProvider, fallback chain construction
 - **Mock Provider** - scriptable LLM for deterministic agent testing
 - **Agent Loop** - full provider-agnostic pipeline integration
 - **Usage** - JSONL logging, multi-record append, directory creation
 - **Auto-PR** - branch naming, specRef formatting, manifest shape validation
 - **Event Log** - ring buffer, stats, capacity limits
 - **Dashboard** - HTML rendering, XSS safety, specs API
-- **Config** - YAML/JSON config loading, precedence, defaults
+- **Config** - YAML/JSON config loading, precedence, defaults, token limits, fallback provider list
 - **Python Spec** - Python language support, fixture scanning
 - **Logger** - structured logging, levels, JSON mode
 - **Fetch Spec** - HTTP(S) download, validation, save
@@ -730,6 +780,7 @@ Evergreen is designed for zero-trust operation on production codebases:
 | **0.7** - Python + Config | Done | Python language support, validate/init CLI, YAML config, specRef fix, 85 tests |
 | **0.8** - CI/CD + Tooling | Done | GitHub Actions CI, diff preview, spec fetch, structured logger, 94 tests |
 | **0.9** - Multi-Spec Scan | Done | Concurrent scan-all, retry queue, specs CLI, 103 tests |
+| **0.9.1** - Model Resilience | Done | Dynamic model discovery, cross-provider fallback, configurable token limits, 118 tests |
 | **1.0** - GA | Planned | Vendor portal, marketplace listing, SLA-backed scanning |
 
 ---
@@ -765,10 +816,10 @@ Every source module's header comment names the FR-IDs it implements (e.g., `// F
 ### Tech Stack
 
 - **Runtime:** Node.js >= 20, TypeScript strict, ESM
-- **AI:** 15 LLM providers via `LLMProvider` abstraction -- Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai` v7), Google Gemini (`@google/generative-ai`), plus 12 OpenAI-compatible providers. Claude Agent SDK for triage.
+- **AI:** 15 LLM providers via `LLMProvider` abstraction -- Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai` v7), Google Gemini (`@google/generative-ai`), plus 12 OpenAI-compatible providers. Dynamic model discovery, cross-provider fallback chain, configurable token limits. Claude Agent SDK for triage.
 - **Server:** Express 5, `@octokit/webhooks`, `@octokit/rest`, `@octokit/auth-app`
 - **CLI:** Commander (12 commands)
-- **Tests:** Vitest (103 tests, 20 suites)
+- **Tests:** Vitest (118 tests, 20 suites)
 - **Scanner:** fast-glob + native regex (no AI)
 - **CI:** GitHub Actions (Node 20+22 matrix, typecheck)
 - **Deploy:** Docker (multi-stage build), Railway, Render
