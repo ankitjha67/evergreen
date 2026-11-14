@@ -231,6 +231,54 @@ describe("buildFallbackChain", () => {
   });
 });
 
+describe("OpenAI-compat model discovery", () => {
+  it("OpenAI-compat providers inherit listModels from OpenAIProvider", () => {
+    const provider = getProvider("ollama");
+    expect(typeof provider.listModels).toBe("function");
+  });
+
+  it("all local providers have listModels", () => {
+    for (const id of ["ollama", "lmstudio", "vllm"]) {
+      const provider = getProvider(id);
+      expect(typeof provider.listModels).toBe("function");
+    }
+  });
+});
+
+describe("Auto-discovery model resolution", () => {
+  it("selectBestModel prefers the preset default when available in discovered list", () => {
+    const models: ModelInfo[] = [
+      { id: "huge-model", contextWindow: 1000000 },
+      { id: "gpt-4o", contextWindow: 128000 },
+      { id: "small-model", contextWindow: 4096 },
+    ];
+    expect(selectBestModel(models, "gpt-4o")).toBe("gpt-4o");
+  });
+
+  it("selectBestModel falls back to largest context when preferred not found", () => {
+    const models: ModelInfo[] = [
+      { id: "model-a", contextWindow: 128000 },
+      { id: "model-b", contextWindow: 200000 },
+    ];
+    expect(selectBestModel(models, "deprecated-model")).toBe("model-b");
+  });
+
+  it("discoverModels returns empty for provider where listModels throws", async () => {
+    const fakeProvider = {
+      id: "throw-test",
+      name: "Throw Test",
+      defaultModel: "model-1",
+      supportsToolUse: false,
+      chat: async () => ({ content: "", toolCalls: [], finishReason: "end_turn" as const, usage: { inputTokens: 0, outputTokens: 0 } }),
+      listModels: async () => { throw new Error("API down"); },
+    };
+    clearModelCache("throw-test");
+    const models = await discoverModels(fakeProvider);
+    expect(models).toEqual([]);
+    clearModelCache("throw-test");
+  });
+});
+
 describe("OpenAI-compat presets", () => {
   it("has at least 10 presets", () => {
     expect(Object.keys(OPENAI_COMPAT_PRESETS).length).toBeGreaterThanOrEqual(10);

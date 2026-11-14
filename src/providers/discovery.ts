@@ -12,11 +12,15 @@ export async function discoverModels(provider: LLMProvider): Promise<ModelInfo[]
 
   if (!provider.listModels) return [];
 
-  const models = await provider.listModels();
-  if (models.length > 0) {
-    modelCache.set(provider.id, { models, fetchedAt: Date.now() });
+  try {
+    const models = await provider.listModels();
+    if (models.length > 0) {
+      modelCache.set(provider.id, { models, fetchedAt: Date.now() });
+    }
+    return models;
+  } catch {
+    return [];
   }
-  return models;
 }
 
 export function clearModelCache(providerId?: string): void {

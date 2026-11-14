@@ -12,6 +12,7 @@ import { triage, actionable } from "./triage/triage.js";
 import { buildMigrationPrompt } from "./migrator/prompt.js";
 import { runMigrationAgent, runProviderMigration } from "./migrator/agent.js";
 import { getProvider, listProviders, buildFallbackChain } from "./providers/registry.js";
+import { discoverModels, selectBestModel } from "./providers/discovery.js";
 import * as git from "./repo/git.js";
 import { renderReport } from "./report/report.js";
 
@@ -101,9 +102,6 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
     // FR-04 - agent run (Agent SDK for Anthropic, provider-agnostic loop for others)
     const providerId = opts.provider ?? cfg.provider;
     const useProviderLoop = providerId && providerId !== "anthropic";
-    const resolvedModel = useProviderLoop && !opts.model && !cfg.model
-      ? (listProviders().find((p) => p.id === providerId)?.defaultModel ?? model)
-      : model;
 
     // Build provider with fallback chain if configured
     const fallbackIds = opts.fallbackProviders ?? cfg.fallbackProviders ?? [];
@@ -114,6 +112,18 @@ export async function migrate(opts: MigrateOptions): Promise<{ spec: BreakingCha
       } else {
         provider = getProvider(providerId);
       }
+    }
+
+    // Resolve model: explicit config > discovered model > preset default > global default
+    let resolvedModel: string;
+    if (opts.model || cfg.model) {
+      resolvedModel = opts.model ?? cfg.model ?? model;
+    } else if (useProviderLoop && provider) {
+      const discovered = await discoverModels(provider);
+      const presetDefault = listProviders().find((p) => p.id === providerId)?.defaultModel;
+      resolvedModel = selectBestModel(discovered, presetDefault) ?? presetDefault ?? model;
+    } else {
+      resolvedModel = model;
     }
 
     const tokenOpts = {
