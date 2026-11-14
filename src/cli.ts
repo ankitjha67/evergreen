@@ -781,6 +781,168 @@ program
     }
   });
 
+// evergreen create-spec - guided spec creation wizard
+program
+  .command("create-spec")
+  .description("Create a changefeed spec from structured input (wizard)")
+  .requiredOption("--vendor <slug>", "vendor slug (e.g. stripe)")
+  .requiredOption("--api <name>", "API name (e.g. stripe-node)")
+  .requiredOption("--version <ver>", "version string (e.g. 2025-03-31)")
+  .option("--title <title>", "spec title")
+  .option("--lang <languages>", "comma-separated languages", "javascript,typescript")
+  .option("--docs-url <url>", "documentation URL")
+  .option("--deadline <date>", "deprecation deadline (ISO date)")
+  .option("--from-json <file>", "import rules from a JSON file")
+  .option("--out <file>", "output file path")
+  .action(async (o: any) => {
+    try {
+      const { buildSpec, validateWizardInput, writeSpec, specFromJson } = await import("./create-spec.js");
+      const { specRef } = await import("./types.js");
+
+      const languages = o.lang.split(",").map((s: string) => s.trim());
+      let input: any;
+
+      if (o.fromJson) {
+        const raw = await readFile(resolve(o.fromJson), "utf8");
+        input = specFromJson(raw);
+        input.vendor = o.vendor;
+        input.api = o.api;
+        input.version = o.version;
+        if (o.title) input.title = o.title;
+        if (o.docsUrl) input.docsUrl = o.docsUrl;
+        if (o.deadline) input.deadline = o.deadline;
+        input.languages = languages;
+      } else {
+        input = {
+          vendor: o.vendor,
+          api: o.api,
+          version: o.version,
+          title: o.title,
+          docsUrl: o.docsUrl,
+          deadline: o.deadline,
+          languages,
+          rules: [],
+        };
+      }
+
+      const errors = validateWizardInput(input);
+      if (errors.length > 0 && !o.fromJson) {
+        // Spec with zero rules is valid only if --from-json provides them
+        const nonRuleErrors = errors.filter((e: string) => !e.includes("at least one rule"));
+        if (nonRuleErrors.length > 0) {
+          console.error(`Validation errors:\n${nonRuleErrors.map((e: string) => `  - ${e}`).join("\n")}`);
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      if (o.fromJson) {
+        const fErrors = validateWizardInput(input);
+        if (fErrors.length > 0) {
+          console.error(`Validation errors:\n${fErrors.map((e: string) => `  - ${e}`).join("\n")}`);
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      const spec = buildSpec(input);
+      const outPath = o.out ?? `specs/${o.vendor}-${o.api}-${o.version.replace(/[^a-z0-9.-]/gi, "-")}.json`;
+
+      await writeSpec(spec, resolve(outPath));
+      console.log(`\nCreated changefeed spec: ${specRef(spec)}`);
+      console.log(`  Title:     ${spec.title}`);
+      console.log(`  Languages: ${spec.languages.join(", ")}`);
+      console.log(`  Rules:     ${spec.changes.length}`);
+      console.log(`  Saved to:  ${resolve(outPath)}\n`);
+    } catch (e: any) {
+      console.error(`Spec creation failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen history - migration history tracking
+program
+  .command("history")
+  .description("Show migration run history with filtering and stats")
+  .option("--repo <path>", "filter by repository path")
+  .option("--spec <ref>", "filter by spec reference")
+  .option("--status <status>", "filter by status (migrated, failed, not_affected, report_only)")
+  .option("--since <date>", "filter by date (ISO format)")
+  .option("--limit <n>", "max entries to show", "20")
+  .option("--json", "machine-readable output", false)
+  .action(async (o: any) => {
+    try {
+      const { queryHistory, formatHistorySummary } = await import("./history.js");
+      const summary = await queryHistory({
+        repo: o.repo,
+        specRef: o.spec,
+        status: o.status,
+        since: o.since,
+        limit: parseInt(o.limit, 10),
+      });
+
+      if (o.json) {
+        console.log(JSON.stringify(summary, null, 2));
+      } else {
+        console.log();
+        console.log(formatHistorySummary(summary));
+        console.log();
+      }
+    } catch (e: any) {
+      console.error(`History query failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen notify - send a test notification
+program
+  .command("notify")
+  .description("Send a test notification to configured channels (Slack, webhook)")
+  .option("--channel <type>", "channel type: slack, webhook, console", "console")
+  .option("--url <url>", "webhook/Slack URL (overrides env)")
+  .option("--message <msg>", "custom notification message", "Evergreen test notification")
+  .action(async (o: any) => {
+    try {
+      const notif = await import("./notifications.js");
+
+      const channels: Array<{ type: "slack" | "webhook" | "console"; url?: string; token?: string; channel?: string }> = o.url
+        ? [{ type: o.channel, url: o.url }]
+        : notif.parseChannelsFromEnv();
+
+      if (channels.length === 0 && o.channel === "console") {
+        channels.push({ type: "console" });
+      }
+
+      if (channels.length === 0) {
+        console.error("No notification channels configured. Set SLACK_WEBHOOK_URL or NOTIFY_WEBHOOK_URL.");
+        process.exitCode = 1;
+        return;
+      }
+
+      const payload = {
+        event: "scan_complete" as const,
+        specRef: "test@test@0.0.0",
+        repo: "test-repo",
+        findingsCount: 0,
+        summary: o.message,
+        timestamp: new Date().toISOString(),
+      };
+
+      for (const ch of channels) {
+        const result = await notif.sendNotification(ch, payload);
+        if (result.ok) {
+          console.log(`Notification sent via ${ch.type}${ch.url ? ` to ${ch.url}` : ""}`);
+        } else {
+          console.error(`Failed to send via ${ch.type}: ${result.error}`);
+          process.exitCode = 1;
+        }
+      }
+    } catch (e: any) {
+      console.error(`Notification failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
 function fail(e: unknown): void {
   if (e instanceof SpecValidationError) {
     console.error(e.message);

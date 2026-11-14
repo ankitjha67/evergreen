@@ -20,7 +20,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change -> update FSD first. Structural change -> ARCHITECTURE/SYSTEM_DESIGN first. New decision -> log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning + OpenAPI diff + spec integrity + monorepo scoping -- 183 tests
+**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning + OpenAPI diff + spec integrity + monorepo scoping + notifications + spec wizard + migration history -- 218 tests
 **Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests. **Ruby/Go support + spec registry (2026-11-14)**: 5 bundled specs across 4 languages, spec registry index fetch, 143 tests.
 
 | Workstream | State |
@@ -61,6 +61,9 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | OpenAPI diff spec generator (FR-01.3) | ✅ `generateSpecFromDiff()` in `src/changefeed/openapi-diff.ts`, `evergreen openapi-diff` CLI command |
 | Spec integrity verification | ✅ SHA-256 checksums in `src/changefeed/integrity.ts`, `evergreen verify-specs` CLI with `--generate` |
 | Monorepo path scoping | ✅ `--scope` flag on scan/migrate/scan-all/diff/estimate commands, `scope` in RepoConfig |
+| Notification channels | ✅ Slack + generic webhook + console notifications in `src/notifications.ts`, `evergreen notify` CLI for testing, `SLACK_WEBHOOK_URL`/`NOTIFY_WEBHOOK_URL` env vars |
+| Spec authoring wizard | ✅ `buildSpec()` + `validateWizardInput()` in `src/create-spec.ts`, `evergreen create-spec` CLI with `--from-json` import, regex validation, language-aware file patterns |
+| Migration history tracking | ✅ `logHistory()` + `queryHistory()` in `src/history.ts`, `evergreen history` CLI with `--repo`/`--spec`/`--status`/`--since` filters, success rate, cost/confidence aggregation |
 | `evergreen validate` CLI | ✅ Validates changefeed spec JSON, shows structured info, `--json` flag |
 | `.evergreen.yaml` config | ✅ YAML config fallback (key-value, comments, list items), `evergreen init` command |
 | specRef collision fix | ✅ `specRef` now `vendor@api@version` -- multi-language specs no longer collide in registry |
@@ -96,6 +99,14 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional -- D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-14 -- Session 15 (Notification channels, spec wizard, migration history)
+- **Webhook notification channels** (`src/notifications.ts`): `buildScanNotification()` and `buildMigrationNotification()` create structured payloads from scan/migration results. `sendNotification()` dispatches to Slack (with rich block formatting), generic webhooks (raw JSON), or console. `parseChannelsFromEnv()` reads `SLACK_WEBHOOK_URL`, `NOTIFY_WEBHOOK_URL`, `NOTIFY_CONSOLE` env vars. `notifyAll()` fans out to multiple channels with aggregated results.
+- **Spec authoring wizard** (`src/create-spec.ts`): `buildSpec()` converts structured `SpecWizardInput` into valid `BreakingChangeSpec`. `validateWizardInput()` checks vendor/api slugs, regex patterns, date formats, required fields. `inferFilePatterns()` maps languages to glob patterns. `specFromJson()` imports existing specs for editing. `evergreen create-spec` CLI with `--vendor`, `--api`, `--version`, `--from-json`, `--out`.
+- **Migration history tracking** (`src/history.ts`): `outcomeToHistoryEntry()` converts `MigrationOutcome` to persistent `HistoryEntry` with id, cost, confidence, verify status. `logHistory()` appends to `data/history.jsonl`. `queryHistory()` filters by repo/spec/status/date with aggregated stats (success rate, avg confidence, total cost). `evergreen history` CLI with `--repo`, `--spec`, `--status`, `--since`, `--limit`, `--json`.
+- **Tests**: 218 passing across 32 suites (35 new: notifications 9, create-spec 13, history 13).
+- **CLI**: 21 commands total (added `create-spec`, `history`, `notify`).
+- Next: vendor portal, marketplace listing, deploy to Railway/Render.
+
 ### 2026-11-14 -- Session 14 (OpenAPI diff, spec integrity, monorepo scoping)
 - **OpenAPI diff spec generator** (`src/changefeed/openapi-diff.ts`): `diffOpenAPISchemas()` compares two OpenAPI schemas and detects: removed paths/methods/params/responses/schemas/fields/enum values, newly required params, deprecated endpoints. `generateSpecFromDiff()` converts diffs into a valid `BreakingChangeSpec`. `evergreen openapi-diff` CLI command with `--vendor`, `--api`, `--version`, `--lang`, `--out` options. Implements FR-01.3 P1 (auto-spec from OpenAPI diff).
 - **Spec integrity verification** (`src/changefeed/integrity.ts`): SHA-256 checksums for spec files. `generateChecksumManifest()` creates `checksums.json`, `verifySpecs()` checks current files against manifest (ok/mismatch/new/missing). `evergreen verify-specs` CLI with `--generate` to create manifest and default verify mode.
