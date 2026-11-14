@@ -27,8 +27,17 @@ export interface ToolDef {
 
 export interface ChatOptions {
   maxTokens?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
   temperature?: number;
   thinking?: boolean;
+}
+
+export interface ModelInfo {
+  id: string;
+  name?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
 }
 
 export interface ChatResponse {
@@ -44,6 +53,8 @@ export interface ProviderConfig {
   model?: string;
   organization?: string;
   headers?: Record<string, string>;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
 }
 
 export interface LLMProvider {
@@ -53,6 +64,7 @@ export interface LLMProvider {
   readonly supportsToolUse: boolean;
 
   chat(messages: ChatMessage[], tools?: ToolDef[], options?: ChatOptions): Promise<ChatResponse>;
+  listModels?(): Promise<ModelInfo[]>;
 }
 
 export interface ProviderPreset {

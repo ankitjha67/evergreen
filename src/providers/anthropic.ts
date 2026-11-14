@@ -1,5 +1,5 @@
 // FR-09.2 - Anthropic Claude provider via Messages API
-import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
+import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig, ModelInfo } from "./types.js";
 
 export class AnthropicProvider implements LLMProvider {
   readonly id = "anthropic";
@@ -13,6 +13,22 @@ export class AnthropicProvider implements LLMProvider {
     if (!this.apiKey) throw new Error("ANTHROPIC_API_KEY is required for the Anthropic provider");
   }
 
+  async listModels(): Promise<ModelInfo[]> {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: this.apiKey });
+    try {
+      const response = await client.models.list({ limit: 100 });
+      return response.data.map((m: any) => ({
+        id: m.id,
+        name: m.display_name ?? m.id,
+        contextWindow: m.context_window,
+        maxOutputTokens: m.max_output,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async chat(messages: ChatMessage[], tools?: ToolDef[], options?: ChatOptions): Promise<ChatResponse> {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey: this.apiKey });
@@ -21,8 +37,8 @@ export class AnthropicProvider implements LLMProvider {
     const apiMessages = convertMessages(messages.filter((m) => m.role !== "system"));
 
     const params: any = {
-      model: options?.maxTokens ? undefined : undefined, // model set below
-      max_tokens: options?.maxTokens ?? 16384,
+      model: undefined as any, // set below
+      max_tokens: options?.maxOutputTokens ?? options?.maxTokens ?? 16384,
       messages: apiMessages,
     };
     if (systemMsg) params.system = systemMsg.content;

@@ -85,12 +85,14 @@ export async function runProviderMigration(
   prompt: string,
   provider: import("../providers/types.js").LLMProvider,
   model: string,
-  opts: { maxTurns?: number } = {},
+  opts: { maxTurns?: number; maxInputTokens?: number; maxOutputTokens?: number } = {},
 ): Promise<AgentRunResult> {
   const { runAgentLoop } = await import("../providers/agent-loop.js");
   const systemPrompt = "You are Evergreen's migration engine. Follow the user's instructions exactly.";
   const { usage, finalText } = await runAgentLoop(provider, systemPrompt, prompt, repo, model, {
     maxTurns: opts.maxTurns,
+    maxInputTokens: opts.maxInputTokens,
+    maxOutputTokens: opts.maxOutputTokens,
   });
   const { manifest, problems } = await readManifest(repo);
   return { manifest, manifestProblems: problems, usage, finalText };

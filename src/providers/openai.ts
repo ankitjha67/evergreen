@@ -1,5 +1,5 @@
 // FR-09.2 - OpenAI provider (GPT-4o, o1, o3, GPT-5)
-import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig } from "./types.js";
+import { LLMProvider, ChatMessage, ChatResponse, ToolDef, ChatOptions, ToolCall, ProviderConfig, ModelInfo } from "./types.js";
 
 export class OpenAIProvider implements LLMProvider {
   readonly id: string;
@@ -24,6 +24,25 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 
+  async listModels(): Promise<ModelInfo[]> {
+    const { default: OpenAI } = await import("openai");
+    const clientOpts: any = { apiKey: this.apiKey || "not-needed" };
+    if (this.baseUrl) clientOpts.baseURL = this.baseUrl;
+    if (this.organization) clientOpts.organization = this.organization;
+    if (this.headers) clientOpts.defaultHeaders = this.headers;
+    const client = new OpenAI(clientOpts);
+    try {
+      const response = await client.models.list();
+      const models: ModelInfo[] = [];
+      for await (const m of response) {
+        models.push({ id: m.id, name: m.id });
+      }
+      return models;
+    } catch {
+      return [];
+    }
+  }
+
   async chat(messages: ChatMessage[], tools?: ToolDef[], options?: ChatOptions): Promise<ChatResponse> {
     const { default: OpenAI } = await import("openai");
     const clientOpts: any = { apiKey: this.apiKey || "not-needed" };
@@ -36,7 +55,7 @@ export class OpenAIProvider implements LLMProvider {
     const params: any = {
       model: this.defaultModel,
       messages: apiMessages,
-      max_tokens: options?.maxTokens ?? 16384,
+      max_tokens: options?.maxOutputTokens ?? options?.maxTokens ?? 16384,
     };
 
     if (tools?.length) {

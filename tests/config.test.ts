@@ -78,4 +78,35 @@ describe("parseYamlConfig", () => {
     const cfg = parseYamlConfig("# just comments\n\n# another");
     expect(cfg).toEqual({});
   });
+
+  it("parses token limit fields", () => {
+    const cfg = parseYamlConfig("maxInputTokens: 200000\nmaxOutputTokens: 16384");
+    expect(cfg.maxInputTokens).toBe(200000);
+    expect(cfg.maxOutputTokens).toBe(16384);
+  });
+
+  it("parses fallback provider list", () => {
+    const cfg = parseYamlConfig("provider: anthropic\nfallback:\n  - openai\n  - gemini");
+    expect(cfg.provider).toBe("anthropic");
+    expect(cfg.fallbackProviders).toEqual(["openai", "gemini"]);
+  });
+
+  it("parses all new fields together", () => {
+    const yaml = `provider: anthropic
+model: claude-opus-5-5
+threshold: 0.8
+maxInputTokens: 128000
+maxOutputTokens: 8192
+fallback:
+  - openai
+  - groq
+ignore:
+  - vendor/**`;
+    const cfg = parseYamlConfig(yaml);
+    expect(cfg.provider).toBe("anthropic");
+    expect(cfg.maxInputTokens).toBe(128000);
+    expect(cfg.maxOutputTokens).toBe(8192);
+    expect(cfg.fallbackProviders).toEqual(["openai", "groq"]);
+    expect(cfg.ignore).toEqual(["vendor/**"]);
+  });
 });

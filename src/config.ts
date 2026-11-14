@@ -51,23 +51,29 @@ export async function loadRepoConfig(repo: string): Promise<RepoConfig> {
 export function parseYamlConfig(content: string): RepoConfig {
   const config: RepoConfig = {};
   const ignoreList: string[] = [];
-  let inIgnore = false;
+  const fallbackList: string[] = [];
+  let currentList: "ignore" | "fallback" | null = null;
 
   for (const rawLine of content.split("\n")) {
     const line = rawLine.split("#")[0].trimEnd();
-    if (!line.trim()) { inIgnore = false; continue; }
+    if (!line.trim()) { currentList = null; continue; }
 
-    if (inIgnore) {
+    if (currentList) {
       const match = line.match(/^\s+-\s+(.+)/);
-      if (match) { ignoreList.push(match[1].trim()); continue; }
-      inIgnore = false;
+      if (match) {
+        if (currentList === "ignore") ignoreList.push(match[1].trim());
+        else if (currentList === "fallback") fallbackList.push(match[1].trim());
+        continue;
+      }
+      currentList = null;
     }
 
     const kv = line.match(/^(\w+)\s*:\s*(.+)/);
     if (!kv) {
       if (line.match(/^(\w+)\s*:/)) {
         const key = line.match(/^(\w+)/)?.[1];
-        if (key === "ignore") inIgnore = true;
+        if (key === "ignore") currentList = "ignore";
+        else if (key === "fallback") currentList = "fallback";
       }
       continue;
     }
@@ -79,10 +85,13 @@ export function parseYamlConfig(content: string): RepoConfig {
       case "model": config.model = v; break;
       case "threshold": config.confidenceThreshold = parseFloat(v); break;
       case "verify": config.verifyCommand = v; break;
-      case "triage": break; // informational only - CLI flag controls triage
+      case "maxInputTokens": config.maxInputTokens = parseInt(v, 10); break;
+      case "maxOutputTokens": config.maxOutputTokens = parseInt(v, 10); break;
+      case "triage": break;
     }
   }
 
   if (ignoreList.length > 0) config.ignore = ignoreList;
+  if (fallbackList.length > 0) config.fallbackProviders = fallbackList;
   return config;
 }
