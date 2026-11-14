@@ -1034,6 +1034,127 @@ program
     }
   });
 
+// evergreen rollback - undo a migration by deleting the evergreen branch
+program
+  .command("rollback")
+  .description("Undo a migration by deleting its evergreen/* branch")
+  .argument("[branch]", "migration branch to delete (omit to list)")
+  .option("--repo <path>", "target repository", process.cwd())
+  .action(async (branch: string | undefined, o: { repo: string }) => {
+    try {
+      const { listMigrationBranches, rollbackMigration, formatRollbackTargets } = await import("./rollback.js");
+      const repo = resolve(o.repo);
+
+      if (!branch) {
+        const targets = await listMigrationBranches(repo);
+        console.log();
+        console.log(formatRollbackTargets(targets));
+        console.log();
+        return;
+      }
+
+      const result = await rollbackMigration(repo, branch);
+      if (result.action === "not_found") {
+        console.error(result.message);
+        process.exitCode = 1;
+      } else {
+        console.log(result.message);
+      }
+    } catch (e: any) {
+      console.error(`Rollback failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen templates - list available spec templates
+program
+  .command("templates")
+  .description("List available changefeed spec templates for common APIs")
+  .option("--lang <language>", "filter by language")
+  .option("--vendor <vendor>", "filter by vendor")
+  .option("--json", "machine-readable output", false)
+  .action(async (o: any) => {
+    try {
+      const { listTemplates, formatTemplateLibrary } = await import("./templates.js");
+      const lib = listTemplates({ language: o.lang, vendor: o.vendor });
+
+      if (o.json) {
+        console.log(JSON.stringify(lib, null, 2));
+      } else {
+        console.log();
+        console.log(formatTemplateLibrary(lib));
+        console.log();
+      }
+    } catch (e: any) {
+      console.error(`Templates failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen from-template - create a spec from a template
+program
+  .command("from-template")
+  .description("Create a changefeed spec from a built-in template")
+  .argument("<id>", "template ID (e.g. stripe/stripe-node)")
+  .requiredOption("--version <ver>", "version string for the spec")
+  .option("--lang <languages>", "override languages (comma-separated)")
+  .option("--out <file>", "output file path")
+  .action(async (id: string, o: any) => {
+    try {
+      const { instantiateTemplate } = await import("./templates.js");
+      const { writeSpec } = await import("./create-spec.js");
+      const { specRef } = await import("./types.js");
+
+      const overrides: Record<string, any> = {};
+      if (o.lang) overrides.languages = o.lang.split(",").map((s: string) => s.trim());
+
+      const spec = instantiateTemplate(id, o.version, overrides);
+      const outPath = o.out ?? `specs/${spec.vendor}-${spec.api}-${spec.version.replace(/[^a-z0-9.-]/gi, "-")}.json`;
+
+      await writeSpec(spec, resolve(outPath));
+      console.log(`\nCreated spec from template: ${specRef(spec)}`);
+      console.log(`  Template: ${id}`);
+      console.log(`  Title:    ${spec.title}`);
+      console.log(`  Rules:    ${spec.changes.length}`);
+      console.log(`  Saved to: ${resolve(outPath)}\n`);
+    } catch (e: any) {
+      console.error(`Template instantiation failed: ${e.message}`);
+      process.exitCode = 1;
+    }
+  });
+
+// evergreen cost-compare - compare migration costs across models
+common(program.command("cost-compare").description("Compare estimated migration costs across multiple LLM models"))
+  .option("--models <ids>", "comma-separated model IDs to compare (default: all known models)")
+  .action(async (o: any) => {
+    try {
+      const { scanOnly } = await import("./orchestrator.js");
+      const { compareCosts, formatCostComparison } = await import("./cost-compare.js");
+
+      const { outcome } = await scanOnly({ repo: o.repo, specPath: o.spec, triage: false, json: false, scope: o.scope ? o.scope.split(",").map((s: string) => s.trim()) : undefined });
+      const findings = outcome.scan.findings;
+
+      if (findings.length === 0) {
+        console.log("\nNo findings - all models cost $0.00\n");
+        process.exitCode = 0;
+        return;
+      }
+
+      const models = o.models ? o.models.split(",").map((s: string) => s.trim()) : undefined;
+      const comparison = await compareCosts(resolve(o.repo), findings, models);
+
+      if (o.json) {
+        console.log(JSON.stringify(comparison, null, 2));
+      } else {
+        console.log();
+        console.log(formatCostComparison(comparison));
+        console.log();
+      }
+    } catch (e) {
+      fail(e);
+    }
+  });
+
 function fail(e: unknown): void {
   if (e instanceof SpecValidationError) {
     console.error(e.message);

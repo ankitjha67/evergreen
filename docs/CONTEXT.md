@@ -20,7 +20,7 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 **Working agreement:** implementation always references these docs. Behavior change -> update FSD first. Structural change -> ARCHITECTURE/SYSTEM_DESIGN first. New decision -> log below. Every working session appends to the Progress Log.
 
 ## 3. Current Status
-**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning + OpenAPI diff + spec integrity + monorepo scoping + notifications + spec wizard + migration history + spec diff viewer + config doctor + export/import -- 252 tests
+**Phase:** Release 0.9 complete + dynamic model discovery + Ruby/Go + campaign analytics + cost estimation + batch scanning + OpenAPI diff + spec integrity + monorepo scoping + notifications + spec wizard + migration history + spec diff viewer + config doctor + export/import + rollback + templates + cost-compare -- 279 tests
 **Milestones:** M1 ✅ (Stripe basil e2e, 2026-11-13). 0.2 ✅ same day. 0.3 ✅ same day: GitHub App server, Check Run alerts, 25 tests. **Real GitHub App registered & end-to-end webhook flow verified on live repo** (2026-11-13). **0.4 ✅ 2026-11-13**: Multi-LLM providers, auto-PR, Dockerfile, 46 tests. **0.5 ✅ 2026-11-13**: Production-readiness (CLI usage, graceful shutdown, request logging, rate limiting), 61 tests. **0.6 ✅ 2026-11-13**: Admin dashboard, specs/events API, event log, spec hot-reload, 70 tests. **0.7 ✅ 2026-11-13**: Python support, validate CLI, YAML config, 85 tests. **0.8 ✅ 2026-11-13**: CI/CD, diff preview, spec fetch, structured logger, 94 tests. **0.9 ✅ 2026-11-13**: Multi-spec scan, retry queue, specs CLI, 103 tests. **Dynamic model discovery (2026-11-14)**: API-based model listing, cross-provider fallback chain, configurable token limits, 118 tests. **Ruby/Go support + spec registry (2026-11-14)**: 5 bundled specs across 4 languages, spec registry index fetch, 143 tests.
 
 | Workstream | State |
@@ -67,6 +67,9 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 | Spec diff viewer | ✅ `diffSpecs()` + `formatSpecDiff()` in `src/spec-diff.ts`, `evergreen spec-diff` CLI compares two spec versions showing added/removed/changed rules with metadata diff |
 | Config doctor | ✅ `runDoctor()` + `formatDoctorReport()` in `src/doctor.ts`, `evergreen doctor` CLI validates Node version, repo config, specs dir, provider auth, git repo, spec integrity |
 | Export/import | ✅ `exportData()` in `src/export.ts`, `evergreen export` CLI for history/scan/findings export as CSV or JSON with filtering, file output support |
+| Migration rollback | ✅ `listMigrationBranches()` + `rollbackMigration()` in `src/rollback.ts`, `evergreen rollback` CLI lists or deletes `evergreen/*` branches |
+| Spec templates | ✅ 6 pre-built templates (Stripe, OpenAI, AWS, Firebase, React, Prisma) in `src/templates.ts`, `evergreen templates` CLI with `--lang`/`--vendor` filters, `evergreen from-template` to instantiate |
+| Cost comparison | ✅ `compareCosts()` + `formatCostComparison()` in `src/cost-compare.ts`, `evergreen cost-compare` CLI compares migration cost across 9 default models with `--models` override |
 | `evergreen validate` CLI | ✅ Validates changefeed spec JSON, shows structured info, `--json` flag |
 | `.evergreen.yaml` config | ✅ YAML config fallback (key-value, comments, list items), `evergreen init` command |
 | specRef collision fix | ✅ `specRef` now `vendor@api@version` -- multi-language specs no longer collide in registry |
@@ -102,6 +105,14 @@ Evergreen makes breaking API changes a non-event: when an API vendor ships a bre
 - OQ-4: Product name/domain (Evergreen is provisional -- D2)
 
 ## 6. Progress Log (append-only, newest first)
+### 2026-11-14 -- Session 17 (Migration rollback, spec templates, cost comparison)
+- **Migration rollback** (`src/rollback.ts`): `listMigrationBranches()` lists all `evergreen/*` branches with commit count, last commit hash/message. `rollbackMigration()` validates branch prefix, detects main branch (main/master), switches off if currently on target, then deletes. `formatRollbackTargets()` renders branch listing. `evergreen rollback [branch]` CLI: lists branches when no arg, deletes specified branch.
+- **Spec templates** (`src/templates.ts`): 6 pre-built templates for common API vendors: Stripe, OpenAI, AWS SDK v2->v3, Firebase v8->v9, React class->hooks, Prisma. `listTemplates()` filters by language/vendor/tag. `getTemplate()` retrieves raw input. `instantiateTemplate()` creates real `BreakingChangeSpec` via `buildSpec()` with version and overrides. `evergreen templates` CLI with `--lang`/`--vendor`/`--json`. `evergreen from-template <id> --version <ver>`.
+- **Cost comparison** (`src/cost-compare.ts`): `compareCosts()` runs `estimateMigrationCost()` across 9 default models (3 Anthropic, 2 OpenAI, 2 Gemini, DeepSeek, Groq/Llama). Sorts by cost, identifies cheapest/most expensive, computes price range ratio. `formatCostComparison()` renders tabular output. `evergreen cost-compare` CLI uses common scan options plus `--models` override.
+- **Tests**: 279 passing across 38 suites (27 new: rollback 8, templates 12, cost-compare 7).
+- **CLI**: 28 commands total (added `rollback`, `templates`, `from-template`, `cost-compare`).
+- Next: continue feature development from roadmap.
+
 ### 2026-11-14 -- Session 16 (Spec diff viewer, config doctor, export/import)
 - **Spec diff viewer** (`src/spec-diff.ts`): `diffSpecs()` compares two `BreakingChangeSpec` instances, detecting added/removed/changed rules plus metadata changes (title, deadline, languages). Per-rule diff checks severity, patterns, file patterns, guidance, before/after examples. `formatSpecDiff()` renders human-readable diff report. `evergreen spec-diff` CLI takes two spec files with `--json` option.
 - **Config doctor** (`src/doctor.ts`): `runDoctor()` runs 7 health checks: Node.js version (>=20), repo config (.evergreen.yaml/.json), specs directory, provider API keys (Anthropic/OpenAI/Gemini), git repository, .evergreen data dir, spec integrity checksums. Returns `DoctorReport` with ok/warn/fail counts. `formatDoctorReport()` renders with icons. `evergreen doctor` CLI with `--repo`, `--specs-dir`, `--json`.
